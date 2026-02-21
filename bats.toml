@@ -1,0 +1,3 @@
+[package]
+name = "zip"
+kind = "lib"
