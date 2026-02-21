@@ -5,6 +5,7 @@
 
 #use array as A
 #use arith as AR
+#use result as R
 
 (* ============================================================
    Types
@@ -35,7 +36,7 @@ val LOCAL_SIG = 67324752
 
 #pub fun find_eocd
   {l:agz}{n:pos}
-  (data: !$A.arr(byte, l, n), data_len: int n): int
+  (data: !$A.arr(byte, l, n), data_len: int n): $R.option(int)
 
 #pub fun parse_eocd
   {l:agz}{n:pos}
@@ -49,7 +50,7 @@ val LOCAL_SIG = 67324752
 
 #pub fun get_data_offset
   {l:agz}{n:pos}
-  (data: !$A.arr(byte, l, n), data_len: int n, local_offset: int): int
+  (data: !$A.arr(byte, l, n), data_len: int n, local_offset: int): $R.option(int)
 
 (* ============================================================
    Internal byte reading
@@ -85,9 +86,12 @@ implement find_eocd {l}{n} (data, data_len) = let
     else if $AR.gt_int_int(0, i) then ~1
     else if $AR.eq_int_int(_u32(data, i, len), 101010256) then i
     else loop(data, i - 1, len, $AR.sub_g1(rem, 1))
+  val raw =
+    if $AR.gt_int_int(22, data_len) then ~1
+    else loop(data, data_len - 22, data_len, $AR.checked_nat(data_len))
 in
-  if $AR.gt_int_int(22, data_len) then ~1
-  else loop(data, data_len - 22, data_len, $AR.checked_nat(data_len))
+  if $AR.gte_int_int(raw, 0) then $R.some(raw)
+  else $R.none()
 end
 
 implement parse_eocd {l}{n} (data, data_len, eocd_offset) =
@@ -123,10 +127,15 @@ in
   in @(entry, header_size) end
 end
 
-implement get_data_offset {l}{n} (data, data_len, local_offset) =
-  if $AR.gt_int_int(local_offset + 30, data_len) then ~1
-  else if $AR.neq_int_int(_u32(data, local_offset, data_len), 67324752) then ~1
-  else let
-    val name_len = _u16(data, local_offset + 26, data_len)
-    val extra_len = _u16(data, local_offset + 28, data_len)
-  in local_offset + 30 + name_len + extra_len end
+implement get_data_offset {l}{n} (data, data_len, local_offset) = let
+  val raw =
+    if $AR.gt_int_int(local_offset + 30, data_len) then ~1
+    else if $AR.neq_int_int(_u32(data, local_offset, data_len), 67324752) then ~1
+    else let
+      val name_len = _u16(data, local_offset + 26, data_len)
+      val extra_len = _u16(data, local_offset + 28, data_len)
+    in local_offset + 30 + name_len + extra_len end
+in
+  if $AR.gte_int_int(raw, 0) then $R.some(raw)
+  else $R.none()
+end
