@@ -1,3 +1,8 @@
 [package]
 name = "zip"
 kind = "lib"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
