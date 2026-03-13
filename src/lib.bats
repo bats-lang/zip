@@ -124,7 +124,7 @@ in
       uncompressed_size = uncompressed_size,
       local_header_offset = local_offset
     }
-  in @(entry, header_size) end
+  in @(entry, cd_offset + header_size) end
 end
 
 implement get_data_offset {l}{n} (data, data_len, local_offset) = let
