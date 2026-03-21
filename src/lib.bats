@@ -12,12 +12,12 @@
    ============================================================ *)
 
 #pub typedef zip_entry = @{
-    name_offset = int,
-    name_len = int,
-    compression = int,
-    compressed_size = int,
-    uncompressed_size = int,
-    local_header_offset = int
+    name_offset = [n:int] int n,
+    name_len = [n:int] int n,
+    compression = [n:int] int n,
+    compressed_size = [n:int] int n,
+    uncompressed_size = [n:int] int n,
+    local_header_offset = [n:int] int n
 }
 
 (* ============================================================
@@ -41,12 +41,12 @@ val LOCAL_SIG = 67324752
 #pub fun parse_eocd
   {l:agz}{n:pos}
   (data: !$A.arr(byte, l, n), data_len: int n, eocd_offset: int)
-  : @(int, int)
+  : @([o:int] int o, [c:int] int c)
 
 #pub fun find_entry_by_name
-  {l:agz}{n:pos}{lb:agz}{nb:pos}
+  {l:agz}{n:pos}{lb:agz}{nb:pos}{cc:int}
   (data: !$A.arr(byte, l, n), data_len: int n,
-   cd_offset: int, cd_count: int,
+   cd_offset: int, cd_count: int cc,
    name: !$A.borrow(byte, lb, nb), name_len: int nb): zip_entry
 
 #pub fun get_data_offset
@@ -84,8 +84,8 @@ fn _parse_cd_entry {l:agz}{n:pos}
   (data: !$A.arr(byte, l, n), data_len: int n, cd_offset: int)
   : @(zip_entry, int) = let
   val empty = @{
-    name_offset = 0, name_len = 0, compression = 0,
-    compressed_size = 0, uncompressed_size = 0, local_header_offset = 0
+    name_offset = g1ofg0_int(0), name_len = g1ofg0_int(0), compression = g1ofg0_int(0),
+    compressed_size = g1ofg0_int(0), uncompressed_size = g1ofg0_int(0), local_header_offset = g1ofg0_int(0)
   }
 in
   if $AR.gt_int_int(cd_offset + 46, data_len) then @(empty, 0)
@@ -100,12 +100,12 @@ in
     val local_offset = _u32(data, cd_offset + 42, data_len)
     val header_size = 46 + name_len + extra_len + comment_len
     val entry = @{
-      name_offset = cd_offset + 46,
-      name_len = name_len,
-      compression = compression,
-      compressed_size = compressed_size,
-      uncompressed_size = uncompressed_size,
-      local_header_offset = local_offset
+      name_offset = g1ofg0_int(cd_offset + 46),
+      name_len = g1ofg0_int(name_len),
+      compression = g1ofg0_int(compression),
+      compressed_size = g1ofg0_int(compressed_size),
+      uncompressed_size = g1ofg0_int(uncompressed_size),
+      local_header_offset = g1ofg0_int(local_offset)
     }
   in @(entry, cd_offset + header_size) end
 end
@@ -152,24 +152,24 @@ in
 end
 
 implement parse_eocd {l}{n} (data, data_len, eocd_offset) =
-  if $AR.gt_int_int(eocd_offset + 22, data_len) then @(~1, 0)
-  else if $AR.neq_int_int(_u32(data, eocd_offset, data_len), 101010256) then @(~1, 0)
-  else @(_u32(data, eocd_offset + 16, data_len), _u16(data, eocd_offset + 10, data_len))
+  if $AR.gt_int_int(eocd_offset + 22, data_len) then @(g1ofg0_int(~1), g1ofg0_int(0))
+  else if $AR.neq_int_int(_u32(data, eocd_offset, data_len), 101010256) then @(g1ofg0_int(~1), g1ofg0_int(0))
+  else @(g1ofg0_int(_u32(data, eocd_offset + 16, data_len)), g1ofg0_int(_u16(data, eocd_offset + 10, data_len)))
 
-implement find_entry_by_name {l}{n}{lb}{nb}
+implement find_entry_by_name {l}{n}{lb}{nb}{cc}
   (data, data_len, cd_offset, cd_count, name, name_len) = let
   val not_found = @{
-    name_offset = ~1, name_len = 0, compression = 0,
-    compressed_size = 0, uncompressed_size = 0, local_header_offset = 0
+    name_offset = g1ofg0_int(~1), name_len = g1ofg0_int(0), compression = g1ofg0_int(0),
+    compressed_size = g1ofg0_int(0), uncompressed_size = g1ofg0_int(0), local_header_offset = g1ofg0_int(0)
   }
   fun loop {l:agz}{n:pos}{lb:agz}{nb:pos}{fuel:nat} .<fuel>.
     (data: !$A.arr(byte, l, n), data_len: int n,
      cd_off: int, remaining: int fuel,
      name: !$A.borrow(byte, lb, nb), name_len: int nb): zip_entry =
     if remaining <= 0 then
-      @{name_offset= ~1, name_len= 0, compression= 0,
-        compressed_size= 0, uncompressed_size= 0,
-        local_header_offset= 0}
+      @{name_offset= g1ofg0_int(~1), name_len= g1ofg0_int(0), compression= g1ofg0_int(0),
+        compressed_size= g1ofg0_int(0), uncompressed_size= g1ofg0_int(0),
+        local_header_offset= g1ofg0_int(0)}
     else let
       val @(entry, next_off) = _parse_cd_entry(data, data_len, cd_off)
     in
@@ -182,7 +182,7 @@ implement find_entry_by_name {l}{n}{lb}{nb}
     end
 in
   if cd_count <= 0 then not_found
-  else loop(data, data_len, cd_offset, $AR.checked_nat(cd_count), name, name_len)
+  else loop(data, data_len, cd_offset, cd_count, name, name_len)
 end
 
 implement get_data_offset {l}{n} (data, data_len, local_offset) = let
