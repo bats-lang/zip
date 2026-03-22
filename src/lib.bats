@@ -36,7 +36,7 @@ val LOCAL_SIG = 67324752
 
 #pub fun find_eocd
   {l:agz}{n:pos}
-  (data: !$A.arr(byte, l, n), data_len: int n): $R.option([n:int] int n)
+  (data: !$A.arr(byte, l, n), data_len: int n): $R.option(int)
 
 #pub fun parse_eocd
   {l:agz}{n:pos}
@@ -51,7 +51,7 @@ val LOCAL_SIG = 67324752
 
 #pub fun get_data_offset
   {l:agz}{n:pos}
-  (data: !$A.arr(byte, l, n), data_len: int n, local_offset: int): $R.option([n:int] int n)
+  (data: !$A.arr(byte, l, n), data_len: int n, local_offset: int): $R.option(int)
 
 (* ============================================================
    Internal byte reading
@@ -145,10 +145,10 @@ implement find_eocd {l}{n} (data, data_len) = let
     else loop(data, i - 1, len, $AR.sub_g1(rem, 1))
   val raw =
     if $AR.gt_int_int(22, data_len) then ~1
-    else loop(data, data_len - 22, data_len, data_len)
+    else loop(data, data_len - 22, data_len, $AR.checked_nat(data_len))
 in
-  if $AR.gte_int_int(raw, 0) then $R.some{[n:int] int n}(g1ofg0_int(raw))
-  else $R.none{[n:int] int n}()
+  if $AR.gte_int_int(raw, 0) then $R.some(raw)
+  else $R.none()
 end
 
 implement parse_eocd {l}{n} (data, data_len, eocd_offset) =
@@ -194,6 +194,6 @@ implement get_data_offset {l}{n} (data, data_len, local_offset) = let
       val extra_len = _u16(data, local_offset + 28, data_len)
     in local_offset + 30 + name_len + extra_len end
 in
-  if $AR.gte_int_int(raw, 0) then $R.some{[n:int] int n}(g1ofg0_int(raw))
-  else $R.none{[n:int] int n}()
+  if $AR.gte_int_int(raw, 0) then $R.some(raw)
+  else $R.none()
 end
