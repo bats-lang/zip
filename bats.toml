@@ -1,7 +1,6 @@
 [package]
 name = "zip"
 kind = "lib"
-unsafe = true
 
 [dependencies]
 "arith" = ""
