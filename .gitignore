@@ -8,3 +8,4 @@ _bats_*
 bats_modules/
 build/
 dist/
+docs/
