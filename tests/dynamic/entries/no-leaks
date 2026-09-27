@@ -1,0 +1,1 @@
+Every directory, ref and span the lookups return is consumed and freed.
