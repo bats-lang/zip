@@ -37,9 +37,9 @@
 (* An entry of a z-byte archive, from its central directory: its local
    header at h, its compressed size s, method m (0 stored, 8 deflate),
    uncompressed size u, and its name [no, no + nl) in the archive (in the
-   central directory) *)
+   central directory; a name is at most 65535 bytes) *)
 #pub datatype zip_ref(z:int) =
-  | {h:nat | h + 30 <= z}{s:nat}{m:int | m == 0 || m == 8}{u:nat}{no,nl:nat | no + nl <= z}
+  | {h:nat | h + 30 <= z}{s:nat}{m:int | m == 0 || m == 8}{u:nat}{no,nl:nat | no + nl <= z; nl < 65536}
     zip_ref_mk(z) of (int h, int s, int m, int u, int no, int nl)
 
 (* An entry's compressed data [d, d + s) inside a z-byte archive, its
