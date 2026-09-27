@@ -1,5 +1,6 @@
 (* zip -- ZIP central directory parser *)
-(* Parses ZIP files from byte buffers. Pure computation. *)
+(* Finds an archive's entries by reading only the ranges each step names.
+   Pure computation. *)
 
 #include "share/atspre_staload.hats"
 
@@ -10,19 +11,6 @@
 (* ============================================================
    Types
    ============================================================ *)
-
-(* The central directory of an n-byte archive: its offset, proven inside
-   the archive, and its entry count. *)
-#pub datatype zip_dir(n:int) =
-  | {c:nat | c <= n}{d:nat | d < 65536} zip_dir_mk(n) of (int c, int d)
-
-(* An entry of an n-byte archive: its name [name_off, name_off + name_len)
-   and its compressed data [data_off, data_off + csize), both proven
-   inside the archive; its compression method (0 stored, 8 deflate, the
-   ones an EPUB uses); its uncompressed size. *)
-#pub datatype zip_entry(n:int) =
-  | {no,nl:nat | no + nl <= n}{d,s:nat | d + s <= n}{m:int | m == 0 || m == 8}{u:nat}
-    zip_entry_mk(n) of (int no, int nl, int d, int s, int m, int u)
 
 (* Ranged reading: an archive of z bytes need not be in memory at once.
    find_cd reads its end (the last t bytes), find_ref its central
@@ -85,21 +73,6 @@
   {l:agz}{z:int}
   (hdr: !$A.arr(byte, l, 30), r: zip_ref(z), z: int z): $R.option(zip_span(z))
 
-(* The central directory named by the archive's end-of-central-directory
-   record, or none when there is no such record or its directory offset
-   is outside the archive. *)
-#pub fun find_dir
-  {l:agz}{n:pos}
-  (data: !$A.arr(byte, l, n), data_len: int n): $R.option(zip_dir(n))
-
-(* The entry named name, or none when there is none (or the directory
-   ends before it, or the entry's local header or data is not inside
-   the archive, or it uses a compression method other than 0 or 8). *)
-#pub fun find_entry
-  {l:agz}{n:pos}{lb:agz}{nb:pos}
-  (data: !$A.arr(byte, l, n), data_len: int n, dir: zip_dir(n),
-   name: !$A.borrow(byte, lb, nb), name_len: int nb): $R.option(zip_entry(n))
-
 (* ============================================================
    Internal byte reading
    ============================================================ *)
@@ -143,69 +116,6 @@ in loop(data, name, 0) end
 (* ============================================================
    Implementations
    ============================================================ *)
-
-implement find_dir {l}{n} (data, data_len) = let
-  (* Scan backwards from the last position an EOCD record fits. *)
-  fun loop {i:int | i >= ~1; i + 22 <= n} .<i + 1>.
-    (data: !$A.arr(byte, l, n), i: int i): $R.option(zip_dir(n)) =
-    if i < 0 then $R.none()
-    else if _u32(data, i) = 101010256 then let
-      val c = _u32(data, i + 16)
-    in
-      if c < 0 then $R.none()
-      else if c > data_len then $R.none()
-      else $R.some(zip_dir_mk(c, _u16(data, i + 10)))
-    end
-    else loop(data, i - 1)
-in
-  if data_len < 22 then $R.none() else loop(data, data_len - 22)
-end
-
-(* The entry whose central directory record is at c and whose name
- (nl bytes) follows it, if its local header and data are inside the
- archive and its method is 0 or 8 *)
-fn _found {l:agz}{n:pos}{c:nat | c + 46 <= n}{nl:nat | c + 46 + nl <= n}
-  (data: !$A.arr(byte, l, n), data_len: int n, c: int c, nl: int nl): $R.option(zip_entry(n)) = let
-  val lh = _u32(data, c + 42)
-  val s = _u32(data, c + 20)
-  val m = _u16(data, c + 10)
-  val u = _u32(data, c + 24)
-in
-  if lh < 0 then $R.none()
-  else if s < 0 then $R.none()
-  else if u < 0 then $R.none()
-  else if lh + 30 > data_len then $R.none()
-  else if _u32(data, lh) <> 67324752 then $R.none()
-  else let
-    val d = lh + 30 + _u16(data, lh + 26) + _u16(data, lh + 28)
-  in
-    if d + s > data_len then $R.none()
-    else if m = 0 then $R.some(zip_entry_mk(c + 46, nl, d, s, 0, u))
-    else if m = 8 then $R.some(zip_entry_mk(c + 46, nl, d, s, 8, u))
-    else $R.none()
-  end
-end
-
-implement find_entry {l}{n}{lb}{nb} (data, data_len, dir, name, name_len) = let
-  (* Entry at c, with r entries left in the directory *)
-  fun loop {c:nat | c <= n}{r:nat} .<r>.
-    (data: !$A.arr(byte, l, n), c: int c, r: int r,
-     name: !$A.borrow(byte, lb, nb)): $R.option(zip_entry(n)) =
-    if r <= 0 then $R.none()
-    else if c + 46 > data_len then $R.none()
-    else if _u32(data, c) <> 33639248 then $R.none()
-    else let
-      val nl = _u16(data, c + 28)
-      val next = c + 46 + nl + _u16(data, c + 30) + _u16(data, c + 32)
-    in
-      if c + 46 + nl > data_len then $R.none()
-      else if nl = name_len && _name_eq(data, c + 46, name, name_len) then
-        _found(data, data_len, c, nl)
-      else if next > data_len then $R.none()
-      else loop(data, next, r - 1, name)
-    end
-  val+ zip_dir_mk(c, d) = dir
-in loop(data, c, d, name) end
 
 implement find_cd {l}{t}{z} (tail, t, z) = let
   (* Scan backwards from the last position a record fits *)
