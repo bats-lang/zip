@@ -35,11 +35,12 @@
   | {c:nat | c + s <= z}{d:nat | d < 65536} zip_cd_mk(z, s) of (int c, int s, int d)
 
 (* An entry of a z-byte archive, from its central directory: its local
-   header at h, its compressed size s, method m (0 stored, 8 deflate)
-   and uncompressed size u *)
+   header at h, its compressed size s, method m (0 stored, 8 deflate),
+   uncompressed size u, and its name [no, no + nl) in the archive (in the
+   central directory) *)
 #pub datatype zip_ref(z:int) =
-  | {h:nat | h + 30 <= z}{s:nat}{m:int | m == 0 || m == 8}{u:nat}
-    zip_ref_mk(z) of (int h, int s, int m, int u)
+  | {h:nat | h + 30 <= z}{s:nat}{m:int | m == 0 || m == 8}{u:nat}{no,nl:nat | no + nl <= z}
+    zip_ref_mk(z) of (int h, int s, int m, int u, int no, int nl)
 
 (* An entry's compressed data [d, d + s) inside a z-byte archive, its
    method and its uncompressed size *)
@@ -236,8 +237,8 @@ in c end
 
 implement find_ref {l}{z}{s}{lb}{nb} (cd, dir, z, name, name_len) = let
   (* Entry record at c, with r entries left in the directory *)
-  fun loop {c:nat | c <= s}{r:nat} .<r>.
-    (cd: !$A.arr(byte, l, s), s: int s, c: int c, r: int r,
+  fun loop {co:nat | co + s <= z}{c:nat | c <= s}{r:nat} .<r>.
+    (cd: !$A.arr(byte, l, s), s: int s, co: int co, c: int c, r: int r,
      name: !$A.borrow(byte, lb, nb)): $R.option(zip_ref(z)) =
     if r <= 0 then $R.none()
     else if c + 46 > s then $R.none()
@@ -257,18 +258,18 @@ implement find_ref {l}{z}{s}{lb}{nb} (cd, dir, z, name, name_len) = let
         else if cs < 0 then $R.none()
         else if u < 0 then $R.none()
         else if h > z - 30 then $R.none()
-        else if m = 0 then $R.some(zip_ref_mk(h, cs, 0, u))
-        else if m = 8 then $R.some(zip_ref_mk(h, cs, 8, u))
+        else if m = 0 then $R.some(zip_ref_mk(h, cs, 0, u, co + c + 46, nl))
+        else if m = 8 then $R.some(zip_ref_mk(h, cs, 8, u, co + c + 46, nl))
         else $R.none()
       end
       else if next > s then $R.none()
-      else loop(cd, s, next, r - 1, name)
+      else loop(cd, s, co, next, r - 1, name)
     end
-  val+ zip_cd_mk(_, s, d) = dir
-in loop(cd, s, 0, d, name) end
+  val+ zip_cd_mk(co, s, d) = dir
+in loop(cd, s, co, 0, d, name) end
 
 implement find_data {l}{z} (hdr, r, z) = let
-  val+ zip_ref_mk(h, cs, m, u) = r
+  val+ zip_ref_mk(h, cs, m, u, _, _) = r
 in
   if _u32(hdr, 0) <> 67324752 then $R.none()
   else let

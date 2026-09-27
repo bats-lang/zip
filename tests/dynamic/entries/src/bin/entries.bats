@@ -311,20 +311,21 @@ fn _ref {l:agz}{s:pos}{k:pos | k <= 1048576}
 in r end
 
 (* Whether the entry named name is found by reading only its ranges:
-   header at h, data [d, d + s), method m, size u (h = ~1: not found) *)
+   header at h, name at no, data [d, d + s), method m, size u (h = ~1:
+   not found) *)
 fn _ranged_entry {l:agz}{l2:agz}{s:pos}{k:pos | k <= 1048576}
   (label: string, a: !$A.arr(byte, l, 211), cd: !$A.arr(byte, l2, s), dir: $Z.zip_cd(211, s),
-   name: string k, h: int, d: int, cs: int, m: int, u: int): bool = let
+   name: string k, h: int, no: int, d: int, cs: int, m: int, u: int): bool = let
   val ok = (case+ _ref(cd, dir, name) of
     | ~$R.some(r) => let
-        val+ $Z.zip_ref_mk(h2, _, _, _) = r
+        val+ $Z.zip_ref_mk(h2, _, _, _, no2, nl2) = r
         val hdr = _slice(a, h2, 30)
         val span = $Z.find_data(hdr, r, 211)
         val () = $A.free<byte>(hdr)
       in
         case+ span of
         | ~$R.some($Z.zip_span_mk(d2, s2, m2, u2)) =>
-            h2 = h && d2 = d && s2 = cs && m2 = m && u2 = u
+            h2 = h && no2 = no && nl2 = g1u2i(string1_length(name)) && d2 = d && s2 = cs && m2 = m && u2 = u
         | ~$R.none() => false
       end
     | ~$R.none() => h = ~1): bool
@@ -343,9 +344,9 @@ in
   | ~$R.some(dir) => let
       val+ $Z.zip_cd_mk(c, s, d) = dir
       val cd = _slice(a, c, s)
-      val r1 = _ranged_entry("a.txt", a, cd, dir, "a.txt", 0, 35, 5, 0, 5)
-      val r2 = _ranged_entry("dir/b.xml", a, cd, dir, "dir/b.xml", 40, 79, 4, 0, 4)
-      val r3 = _ranged_entry("missing", a, cd, dir, "zz", ~1, 0, 0, 0, 0)
+      val r1 = _ranged_entry("a.txt", a, cd, dir, "a.txt", 0, 129, 35, 5, 0, 5)
+      val r2 = _ranged_entry("dir/b.xml", a, cd, dir, "dir/b.xml", 40, 180, 79, 4, 0, 4)
+      val r3 = _ranged_entry("missing", a, cd, dir, "zz", ~1, 0, 0, 0, 0, 0)
       val () = $A.free<byte>(cd)
       val ok = c = 83 && s = 106 && d = 2
       val () = (if ok then () else println! ("FAIL ranged find_cd"))
