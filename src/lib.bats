@@ -29,9 +29,10 @@
 (* An entry of a z-byte archive, from its central directory: its local
    header at h, its compressed size s, method m (0 stored, 8 deflate),
    uncompressed size u, and its name [no, no + nl) in the archive (in the
-   central directory; a name is at most 65535 bytes) *)
+   central directory; a name is 1 to 65535 bytes, the length of the name
+   find_ref was given) *)
 #pub datavtype zip_ref(z:int) =
-  | {h:nat | h + 30 <= z}{s:nat}{m:int | m == 0 || m == 8}{u:nat}{no,nl:nat | no + nl <= z; nl < 65536}
+  | {h:nat | h + 30 <= z}{s:nat}{m:int | m == 0 || m == 8}{u:nat}{no:nat}{nl:pos | no + nl <= z; nl < 65536}
     zip_ref_mk(z) of (int h, int s, int m, int u, int no, int nl)
 
 (* An entry's compressed data [d, d + s) inside a z-byte archive, its
@@ -169,7 +170,9 @@ implement find_ref {l}{z}{s}{lb}{nb} (cd, dir, z, name, name_len) = let
       val next = c + 46 + nl + _u16(cd, c + 30) + _u16(cd, c + 32)
     in
       if c + 46 + nl > s then $R.none()
-      else if nl = name_len && _name_eq(cd, c + 46, name, name_len) then let
+      else if nl <> name_len then
+        (if next > s then $R.none() else loop(cd, s, co, next, r - 1, name))
+      else if _name_eq(cd, c + 46, name, name_len) then let
         val h = _u32(cd, c + 42)
         val cs = _u32(cd, c + 20)
         val m = _u16(cd, c + 10)
