@@ -41,6 +41,15 @@
   | {d,s:nat | d + s <= z}{m:int | m == 0 || m == 8}{u:nat}
     zip_span_mk(z) of (int d, int s, int m, int u)
 
+(* The entries of the s-byte central directory of a z-byte archive,
+   each record checked once, by cd_refs: an entry's local header at h,
+   its compressed size cs, method m, uncompressed size u, and its name
+   [no, no + nl) in the directory; k entries *)
+#pub datavtype zip_refs(z:int, s:int, k:int) =
+  | zip_refs_nil(z, s, 0) of ()
+  | {k:nat}{h:nat | h + 30 <= z}{cs:nat}{m:int | m == 0 || m == 8}{u:nat}{no:nat}{nl:pos | no + nl <= s; nl < 65536}
+    zip_refs_cons(z, s, k + 1) of (int h, int cs, int m, int u, int no, int nl, zip_refs(z, s, k))
+
 (* The most bytes at an archive's end that its end-of-central-directory
    record (22 bytes and a comment of at most 65535) spans *)
 #pub stadef ZIP_TAIL_MAX = 65557
@@ -80,6 +89,29 @@
 #pub fun find_data
   {l:agz}{z:int}
   (hdr: !$A.arr(byte, l, 30), r: !zip_ref(z), z: int z): $R.option(zip_span(z))
+
+(* Every entry of the central directory cd (read from the directory's
+   offset), in order, or none when a record is not an entry record or
+   runs past the directory. An entry that find_ref could never return
+   (an empty name, a local header outside the archive, a method neither
+   0 nor 8, a negative size) is left out. *)
+#pub fun cd_refs
+  {l:agz}{z:int}{s:pos}
+  (cd: !$A.arr(byte, l, s), dir: !zip_cd(z, s), z: int z): $R.option([k:nat] zip_refs(z, s, k))
+
+#pub fun zip_refs_free {z,s:int}{k:nat} (rs: zip_refs(z, s, k)): void
+
+(* Whether the name [no, no + nl) in cd is name *)
+#pub fun cd_name_eq
+  {l:agz}{s:pos}{no:nat}{nl:pos | no + nl <= s}{lb:agz}{nb:pos}
+  (cd: !$A.arr(byte, l, s), no: int no, nl: int nl,
+   name: !$A.borrow(byte, lb, nb), nb: int nb): bool
+
+(* find_data for the entry whose local header is at h, of compressed
+   size cs, method m and uncompressed size u (a zip_refs entry's) *)
+#pub fun find_data_at
+  {l:agz}{z:int}{h:nat | h + 30 <= z}{cs:nat}{m:int | m == 0 || m == 8}{u:nat}
+  (hdr: !$A.arr(byte, l, 30), h: int h, cs: int cs, m: int m, u: int u, z: int z): $R.option(zip_span(z))
 
 (* ============================================================
    Internal byte reading
@@ -200,11 +232,7 @@ implement ref_header {z} (r) = let
   prval () = fold@(r)
 in h1 end
 
-implement find_data {l}{z} (hdr, r, z) = let
-  val+ @zip_ref_mk(h0, cs0, m0, u0, _, _) = r
-  val h = h0 and cs = cs0 and m = m0 and u = u0
-  prval () = fold@(r)
-in
+implement find_data_at {l}{z}{h}{cs}{m}{u} (hdr, h, cs, m, u, z) =
   if _u32(hdr, 0) <> 67324752 then $R.none()
   else let
     val d = h + 30 + _u16(hdr, 26) + _u16(hdr, 28)
@@ -212,4 +240,60 @@ in
     if d > z - cs then $R.none()
     else $R.some(zip_span_mk(d, cs, m, u))
   end
-end
+
+implement find_data {l}{z} (hdr, r, z) = let
+  val+ @zip_ref_mk(h0, cs0, m0, u0, _, _) = r
+  val h = h0 and cs = cs0 and m = m0 and u = u0
+  prval () = fold@(r)
+in find_data_at(hdr, h, cs, m, u, z) end
+
+implement cd_refs {l}{z}{s} (cd, dir, z) = let
+  (* rs reversed onto acc *)
+  fun rev {k,a:nat} .<k>.
+    (rs: zip_refs(z, s, k), acc: zip_refs(z, s, a)): zip_refs(z, s, k + a) =
+    case+ rs of
+    | ~zip_refs_nil() => acc
+    | ~zip_refs_cons(h, cs, m, u, no, nl, rest) => rev(rest, zip_refs_cons(h, cs, m, u, no, nl, acc))
+  (* The entries from the record at c, with r records left, onto acc
+     (newest first) *)
+  fun loop {c:nat | c <= s}{r:nat}{a:nat} .<r>.
+    (cd: !$A.arr(byte, l, s), s: int s, c: int c, r: int r, acc: zip_refs(z, s, a))
+    : $R.option([k:nat] zip_refs(z, s, k)) =
+    if r <= 0 then $R.some(rev(acc, zip_refs_nil()))
+    else if c + 46 > s then let val () = zip_refs_free(acc) in $R.none() end
+    else if _u32(cd, c) <> 33639248 then let val () = zip_refs_free(acc) in $R.none() end
+    else let
+      val nl = _u16(cd, c + 28)
+      val next = c + 46 + nl + _u16(cd, c + 30) + _u16(cd, c + 32)
+    in
+      if next > s then let val () = zip_refs_free(acc) in $R.none() end
+      else let
+        val h = _u32(cd, c + 42)
+        val cs = _u32(cd, c + 20)
+        val m = _u16(cd, c + 10)
+        val u = _u32(cd, c + 24)
+      in
+        if nl <= 0 then loop(cd, s, next, r - 1, acc)
+        else if h < 0 then loop(cd, s, next, r - 1, acc)
+        else if cs < 0 then loop(cd, s, next, r - 1, acc)
+        else if u < 0 then loop(cd, s, next, r - 1, acc)
+        else if h > z - 30 then loop(cd, s, next, r - 1, acc)
+        else if m = 0 then loop(cd, s, next, r - 1, zip_refs_cons(h, cs, 0, u, c + 46, nl, acc))
+        else if m = 8 then loop(cd, s, next, r - 1, zip_refs_cons(h, cs, 8, u, c + 46, nl, acc))
+        else loop(cd, s, next, r - 1, acc)
+      end
+    end
+  val+ @zip_cd_mk(_, s, d) = dir
+  val s1 = s and d1 = d
+  prval () = fold@(dir)
+in loop(cd, s1, 0, d1, zip_refs_nil()) end
+
+implement zip_refs_free {z,s}{k} (rs) = let
+  fun free {k:nat} .<k>. (rs: zip_refs(z, s, k)): void =
+    case+ rs of
+    | ~zip_refs_nil() => ()
+    | ~zip_refs_cons(_, _, _, _, _, _, rest) => free(rest)
+in free(rs) end
+
+implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
+  if nl <> nb then false else _name_eq(cd, no, name, nb)
