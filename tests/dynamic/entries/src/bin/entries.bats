@@ -281,8 +281,89 @@ fn _oversized {l:agz} (a: !$A.arr(byte, l, 211)): bool =
     in r1 && r2 end
   | ~$R.none() => false
 
+(* a[o, o + k), as a file read at o would give it *)
+fn _slice {l:agz}{o:nat}{k:pos | o + k <= 211}
+  (a: !$A.arr(byte, l, 211), o: int o, k: int k): [l2:agz] $A.arr(byte, l2, k) = let
+  val b = $A.alloc<byte>(k)
+  fun copy {l2:agz}{i:nat | i <= k} .<k - i>. (a: !$A.arr(byte, l, 211), b: !$A.arr(byte, l2, k), i: int i): void =
+    if i >= k then ()
+    else let
+      val () = $A.set<byte>(b, i, $A.get<byte>(a, o + i))
+    in copy(a, b, i + 1) end
+  val () = copy(a, b, 0)
+in b end
+
+(* name as bytes, for find_ref *)
+fn _ref {l:agz}{s:pos}{k:pos | k <= 1048576}
+  (cd: !$A.arr(byte, l, s), dir: $Z.zip_cd(211, s), name: string k): $R.option($Z.zip_ref(211)) = let
+  val k = g1u2i(string1_length(name))
+  val nm = $A.alloc<byte>(k)
+  fun fill {l2:agz}{i:nat | i <= k} .<k - i>. (nm: !$A.arr(byte, l2, k), i: int i): void =
+    if i >= k then ()
+    else let
+      val () = $A.set<byte>(nm, i, $A.int2byte($AR.byte_of_char(string_get_at(name, i))))
+    in fill(nm, i + 1) end
+  val () = fill(nm, 0)
+  val @(f, b) = $A.freeze<byte>(nm)
+  val r = $Z.find_ref(cd, dir, 211, b, k)
+  val () = $A.drop<byte>(f, b)
+  val () = $A.free<byte>($A.thaw<byte>(f))
+in r end
+
+(* Whether the entry named name is found by reading only its ranges:
+   header at h, name at no, data [d, d + s), method m, size u (h = ~1:
+   not found) *)
+fn _ranged_entry {l:agz}{l2:agz}{s:pos}{k:pos | k <= 1048576}
+  (label: string, a: !$A.arr(byte, l, 211), cd: !$A.arr(byte, l2, s), dir: $Z.zip_cd(211, s),
+   name: string k, h: int, no: int, d: int, cs: int, m: int, u: int): bool = let
+  val ok = (case+ _ref(cd, dir, name) of
+    | ~$R.some(r) => let
+        val+ $Z.zip_ref_mk(h2, _, _, _, no2, nl2) = r
+        val hdr = _slice(a, h2, 30)
+        val span = $Z.find_data(hdr, r, 211)
+        val () = $A.free<byte>(hdr)
+      in
+        case+ span of
+        | ~$R.some($Z.zip_span_mk(d2, s2, m2, u2)) =>
+            h2 = h && no2 = no && nl2 = g1u2i(string1_length(name)) && d2 = d && s2 = cs && m2 = m && u2 = u
+        | ~$R.none() => false
+      end
+    | ~$R.none() => h = ~1): bool
+  val () = (if ok then () else println! ("FAIL ranged ", label))
+in ok end
+
+(* The central directory from the archive's last t bytes (read at
+   211 - t), and both entries and a missing one through it *)
+fn _ranged {l:agz}{t:pos | t <= 211}
+  (a: !$A.arr(byte, l, 211), t: int t): bool = let
+  val tail = _slice(a, 211 - t, t)
+  val found = $Z.find_cd(tail, t, 211)
+  val () = $A.free<byte>(tail)
+in
+  case+ found of
+  | ~$R.some(dir) => let
+      val+ $Z.zip_cd_mk(c, s, d) = dir
+      val cd = _slice(a, c, s)
+      val r1 = _ranged_entry("a.txt", a, cd, dir, "a.txt", 0, 129, 35, 5, 0, 5)
+      val r2 = _ranged_entry("dir/b.xml", a, cd, dir, "dir/b.xml", 40, 180, 79, 4, 0, 4)
+      val r3 = _ranged_entry("missing", a, cd, dir, "zz", ~1, 0, 0, 0, 0, 0)
+      val () = $A.free<byte>(cd)
+      val ok = c = 83 && s = 106 && d = 2
+      val () = (if ok then () else println! ("FAIL ranged find_cd"))
+    in ok && r1 && r2 && r3 end
+  | ~$R.none() => let
+      val () = println! ("FAIL ranged find_cd: none")
+    in false end
+end
+
 implement main0 () = let
   val a = _archive()
+  (* The same entries, reading only the ranges each step names: from the
+     whole archive as its tail, and from a 150-byte tail that starts
+     inside the local data (the record is found at tail offset 128). *)
+  val t0a = _ranged(a, 211)
+  val t0b = _ranged(a, 150)
+  val t0 = t0a && t0b
   (* Well-formed archive: the directory is at 83 with 2 entries; a.txt's
      name is at 129 and its 5 stored bytes at 35 (local header 0, name
      5 bytes); dir/b.xml's name is at 180 and its 4 bytes at 79 (local
@@ -299,7 +380,7 @@ implement main0 () = let
   val () = _ff(a, 205)
   val t4 = _dir("corrupt cd offset", a, 211, ~1, 0)
   val () = $A.free<byte>(a)
-  val ok = t1 && t2 && t3 && t4
+  val ok = t0 && t1 && t2 && t3 && t4
 in
   if ok then println! ("entries: all cases pass")
   else exit_void(1)
