@@ -222,72 +222,84 @@ fn _archive (): [l:agz] $A.arr(byte, l, 211) = let
   val () = $A.set<byte>(a, 210, $A.int2byte(0))
 in a end
 
-fn _opt (o: $R.option([o:nat] int o)): $Z.zint =
-  case+ o of | ~$R.some(v) => v | ~$R.none() => ~1
-
-(* Looks up a name given as chars and compares every field (and the
-   data offset) with the expected values. *)
-fn _entry {l:agz}{n:pos}{k:pos | k <= 1048576}{c,d:int}
-  (data: !$A.arr(byte, l, n), len: int n, cd: int c, cnt: int d,
-   chars: &(@[char][k]), k: int k,
-   off: int, nlen: int, comp: int, csz: int, usz: int, loc: int, doff: int): bool = let
-  val @(f, b) = $A.freeze<byte>($S.from_char_array(chars, k))
-  val e = $Z.find_entry_by_name(data, len, cd, cnt, b, k)
+(* Whether find_entry gives the entry (name offset and length, data
+   offset and size, method, size) or none (no = ~1) *)
+fn _entry {l:agz}{n:pos}{k:pos | k <= 1048576}
+  (label: string, a: !$A.arr(byte, l, n), n: int n, dir: $Z.zip_dir(n),
+   name: string k,
+   no: int, nl: int, d: int, s: int, m: int, u: int): bool = let
+  val k = g1u2i(string1_length(name))
+  val nm = $A.alloc<byte>(k)
+  fun fill {l2:agz}{i:nat | i <= k} .<k - i>. (nm: !$A.arr(byte, l2, k), i: int i): void =
+    if i >= k then ()
+    else let
+      val () = $A.set<byte>(nm, i, $A.int2byte($AR.byte_of_char(string_get_at(name, i))))
+    in fill(nm, i + 1) end
+  val () = fill(nm, 0)
+  val @(f, b) = $A.freeze<byte>(nm)
+  val r = $Z.find_entry(a, n, dir, b, k)
   val () = $A.drop<byte>(f, b)
   val () = $A.free<byte>($A.thaw<byte>(f))
-  val d = (if e.name_offset >= 0 then _opt($Z.get_data_offset(data, len, e.local_header_offset)) else ~1): int
-  val ok = e.name_offset = off && e.name_len = nlen && e.compression = comp
-    && e.compressed_size = csz && e.uncompressed_size = usz
-    && e.local_header_offset = loc && d = doff
-in
-  if ok then true
-  else let
-    val () = println! ("FAIL entry ", e.name_offset, " ", e.name_len, " ", e.compression, " ",
-                       e.compressed_size, " ", e.uncompressed_size, " ", e.local_header_offset, " ", d)
-  in false end
-end
+  val ok = (case+ r of
+    | ~$R.some($Z.zip_entry_mk(no2, nl2, d2, s2, m2, u2)) =>
+        no2 = no && nl2 = nl && d2 = d && s2 = s && m2 = m && u2 = u
+    | ~$R.none() => no = ~1): bool
+  val () = (if ok then () else println! ("FAIL ", label))
+in ok end
 
-fn _pair (label: string, got: @(int, int), a: int, b: int): bool =
-  if got.0 = a && got.1 = b then true
-  else let val () = println! ("FAIL ", label, " ", got.0, " ", got.1) in false end
+(* Whether find_dir gives the directory (offset, count), or none (c = ~1) *)
+fn _dir {l:agz}{n:pos} (label: string, a: !$A.arr(byte, l, n), n: int n, c: int, d: int): bool = let
+  val ok = (case+ $Z.find_dir(a, n) of
+    | ~$R.some($Z.zip_dir_mk(c2, d2)) => c2 = c && d2 = d
+    | ~$R.none() => c = ~1): bool
+  val () = (if ok then () else println! ("FAIL ", label))
+in ok end
 
-fn _one (label: string, got: int, want: int): bool =
-  if got = want then true
-  else let val () = println! ("FAIL ", label, " ", got) in false end
+(* Sets the 4 bytes at o to 0xFF *)
+fn _ff {l:agz}{o:nat | o + 4 <= 211} (a: !$A.arr(byte, l, 211), o: int o): void = let
+  val () = $A.set<byte>(a, o, $A.int2byte(255))
+  val () = $A.set<byte>(a, o + 1, $A.int2byte(255))
+  val () = $A.set<byte>(a, o + 2, $A.int2byte(255))
+in $A.set<byte>(a, o + 3, $A.int2byte(255)) end
+
+(* Both entries of the well-formed archive, and a missing name *)
+fn _well_formed {l:agz} (a: !$A.arr(byte, l, 211)): bool =
+  case+ $Z.find_dir(a, 211) of
+  | ~$R.some(dir) => let
+      val r1 = _entry("a.txt", a, 211, dir, "a.txt", 129, 5, 35, 5, 0, 5)
+      val r2 = _entry("dir/b.xml", a, 211, dir, "dir/b.xml", 180, 9, 79, 4, 0, 4)
+      val r3 = _entry("missing", a, 211, dir, "zz", ~1, 0, 0, 0, 0, 0)
+    in r1 && r2 && r3 end
+  | ~$R.none() => false
+
+(* After a.txt's compressed size is set past the archive *)
+fn _oversized {l:agz} (a: !$A.arr(byte, l, 211)): bool =
+  case+ $Z.find_dir(a, 211) of
+  | ~$R.some(dir) => let
+      val r1 = _entry("oversized a.txt", a, 211, dir, "a.txt", ~1, 0, 0, 0, 0, 0)
+      val r2 = _entry("dir/b.xml after", a, 211, dir, "dir/b.xml", 180, 9, 79, 4, 0, 4)
+    in r1 && r2 end
+  | ~$R.none() => false
 
 implement main0 () = let
   val a = _archive()
-  (* Well-formed archive; values from the pre-proof implementation. *)
-  val eocd = $Z.find_eocd(a, 211)
-  val e = _opt(eocd)
-  val t1 = _one("find_eocd", e, 189)
-  val @(cd, cnt) = $Z.parse_eocd(a, 211, e)
-  val t2 = _pair("parse_eocd", @(cd, cnt), 83, 2)
-  var n1 = @[char][5]('a', '.', 't', 'x', 't')
-  val t3 = _entry(a, 211, cd, cnt, n1, 5, 129, 5, 0, 5, 5, 0, 35)
-  var n2 = @[char][9]('d', 'i', 'r', '/', 'b', '.', 'x', 'm', 'l')
-  val t4 = _entry(a, 211, cd, cnt, n2, 9, 180, 9, 0, 4, 4, 40, 79)
-  var n3 = @[char][2]('z', 'z')
-  val t5 = _entry(a, 211, cd, cnt, n3, 2, ~1, 0, 0, 0, 0, 0, ~1)
-  val t6 = _pair("parse_eocd at 0", $Z.parse_eocd(a, 211, 0), ~1, 0)
-  val t7 = _one("data offset at 1", _opt($Z.get_data_offset(a, 211, 1)), ~1)
-  (* Out-of-range offsets. The previous implementation read outside the
-     buffer for every negative offset. *)
-  val t8 = _pair("parse_eocd at -5", $Z.parse_eocd(a, 211, ~5), ~1, 0)
-  val t9 = _pair("parse_eocd past end", $Z.parse_eocd(a, 211, 200), ~1, 0)
-  val t10 = _one("data offset at -3", _opt($Z.get_data_offset(a, 211, ~3)), ~1)
-  val t11 = _entry(a, 211, ~1, 2, n1, 5, ~1, 0, 0, 0, 0, 0, ~1)
-  val t12 = _entry(a, 211, 83, ~4, n1, 5, ~1, 0, 0, 0, 0, 0, ~1)
-  (* EOCD whose central-directory offset field is 0xFFFFFFFF (= -1). *)
-  val () = $A.set<byte>(a, 205, $A.int2byte(255))
-  val () = $A.set<byte>(a, 206, $A.int2byte(255))
-  val () = $A.set<byte>(a, 207, $A.int2byte(255))
-  val () = $A.set<byte>(a, 208, $A.int2byte(255))
-  val @(cd2, cnt2) = $Z.parse_eocd(a, 211, 189)
-  val t13 = _pair("corrupt cd offset", @(cd2, cnt2), ~1, 2)
-  val t14 = _entry(a, 211, cd2, cnt2, n1, 5, ~1, 0, 0, 0, 0, 0, ~1)
+  (* Well-formed archive: the directory is at 83 with 2 entries; a.txt's
+     name is at 129 and its 5 stored bytes at 35 (local header 0, name
+     5 bytes); dir/b.xml's name is at 180 and its 4 bytes at 79 (local
+     header 40). *)
+  val t1 = _dir("find_dir", a, 211, 83, 2)
+  val t2 = _well_formed(a)
+  (* a.txt's compressed size (CD offset 83 + 20) set to 0xFFFFFFFF: its
+     data would run past the archive, so it is not found; dir/b.xml
+     still is. *)
+  val () = _ff(a, 103)
+  val t3 = _oversized(a)
+  (* EOCD whose central-directory offset field is 0xFFFFFFFF: no
+     directory. *)
+  val () = _ff(a, 205)
+  val t4 = _dir("corrupt cd offset", a, 211, ~1, 0)
   val () = $A.free<byte>(a)
-  val ok = t1 && t2 && t3 && t4 && t5 && t6 && t7 && t8 && t9 && t10 && t11 && t12 && t13 && t14
+  val ok = t1 && t2 && t3 && t4
 in
   if ok then println! ("entries: all cases pass")
   else exit_void(1)
