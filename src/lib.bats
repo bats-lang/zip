@@ -24,9 +24,65 @@
   | {no,nl:nat | no + nl <= n}{d,s:nat | d + s <= n}{m:int | m == 0 || m == 8}{u:nat}
     zip_entry_mk(n) of (int no, int nl, int d, int s, int m, int u)
 
+(* Ranged reading: an archive of z bytes need not be in memory at once.
+   find_cd reads its end (the last t bytes), find_ref its central
+   directory, find_data an entry's local header; each result names the
+   next range to read, proven inside the archive. *)
+
+(* The central directory of a z-byte archive: [c, c + s), inside it,
+   holding d entries *)
+#pub datatype zip_cd(z:int, s:int) =
+  | {c:nat | c + s <= z}{d:nat | d < 65536} zip_cd_mk(z, s) of (int c, int s, int d)
+
+(* An entry of a z-byte archive, from its central directory: its local
+   header at h, its compressed size s, method m (0 stored, 8 deflate)
+   and uncompressed size u *)
+#pub datatype zip_ref(z:int) =
+  | {h:nat | h + 30 <= z}{s:nat}{m:int | m == 0 || m == 8}{u:nat}
+    zip_ref_mk(z) of (int h, int s, int m, int u)
+
+(* An entry's compressed data [d, d + s) inside a z-byte archive, its
+   method and its uncompressed size *)
+#pub datatype zip_span(z:int) =
+  | {d,s:nat | d + s <= z}{m:int | m == 0 || m == 8}{u:nat}
+    zip_span_mk(z) of (int d, int s, int m, int u)
+
+(* The most bytes at an archive's end that its end-of-central-directory
+   record (22 bytes and a comment of at most 65535) spans *)
+#pub stadef ZIP_TAIL_MAX = 65557
+
 (* ============================================================
    Public API
    ============================================================ *)
+
+(* The central directory of a z-byte archive whose last t bytes are tail
+   (read from offset z - t; t = min(z, ZIP_TAIL_MAX) finds any record),
+   or none when tail holds no end-of-central-directory record or the
+   directory it names is empty or outside the archive *)
+#pub fun find_cd
+  {l:agz}{t:pos}{z:int | t <= z}
+  (tail: !$A.arr(byte, l, t), t: int t, z: int z): $R.option([s:pos] zip_cd(z, s))
+
+(* The directory's size *)
+#pub fun cd_size {z,s:int} (dir: zip_cd(z, s)): int s
+
+(* The directory's offset *)
+#pub fun cd_offset {z,s:int} (dir: zip_cd(z, s)): [c:nat | c + s <= z] int c
+
+(* The entry named name in the central directory cd (read from the
+   directory's offset), or none when there is none or its local header
+   is outside the archive or its method is neither 0 nor 8 *)
+#pub fun find_ref
+  {l:agz}{z:int}{s:pos}{lb:agz}{nb:pos}
+  (cd: !$A.arr(byte, l, s), dir: zip_cd(z, s), z: int z,
+   name: !$A.borrow(byte, lb, nb), name_len: int nb): $R.option(zip_ref(z))
+
+(* The entry's compressed data, given hdr, its 30-byte local header (read
+   from the ref's h), or none when hdr is not a local header or the data
+   is outside the archive *)
+#pub fun find_data
+  {l:agz}{z:int}
+  (hdr: !$A.arr(byte, l, 30), r: zip_ref(z), z: int z): $R.option(zip_span(z))
 
 (* The central directory named by the archive's end-of-central-directory
    record, or none when there is no such record or its directory offset
@@ -149,3 +205,76 @@ implement find_entry {l}{n}{lb}{nb} (data, data_len, dir, name, name_len) = let
     end
   val+ zip_dir_mk(c, d) = dir
 in loop(data, c, d, name) end
+
+implement find_cd {l}{t}{z} (tail, t, z) = let
+  (* Scan backwards from the last position a record fits *)
+  fun loop {i:int | i >= ~1; i + 22 <= t} .<i + 1>.
+    (tail: !$A.arr(byte, l, t), i: int i): $R.option([s:pos] zip_cd(z, s)) =
+    if i < 0 then $R.none()
+    else if _u32(tail, i) = 101010256 then let
+      val d = _u16(tail, i + 10)
+      val s = _u32(tail, i + 12)
+      val c = _u32(tail, i + 16)
+    in
+      if c < 0 then $R.none()
+      else if s <= 0 then $R.none()
+      else if c > z - s then $R.none()
+      else $R.some(zip_cd_mk(c, s, d))
+    end
+    else loop(tail, i - 1)
+in
+  if t < 22 then $R.none() else loop(tail, t - 22)
+end
+
+implement cd_size {z,s} (dir) = let
+  val+ zip_cd_mk(_, n, _) = dir
+in n end
+
+implement cd_offset {z,s} (dir) = let
+  val+ zip_cd_mk(c, _, _) = dir
+in c end
+
+implement find_ref {l}{z}{s}{lb}{nb} (cd, dir, z, name, name_len) = let
+  (* Entry record at c, with r entries left in the directory *)
+  fun loop {c:nat | c <= s}{r:nat} .<r>.
+    (cd: !$A.arr(byte, l, s), s: int s, c: int c, r: int r,
+     name: !$A.borrow(byte, lb, nb)): $R.option(zip_ref(z)) =
+    if r <= 0 then $R.none()
+    else if c + 46 > s then $R.none()
+    else if _u32(cd, c) <> 33639248 then $R.none()
+    else let
+      val nl = _u16(cd, c + 28)
+      val next = c + 46 + nl + _u16(cd, c + 30) + _u16(cd, c + 32)
+    in
+      if c + 46 + nl > s then $R.none()
+      else if nl = name_len && _name_eq(cd, c + 46, name, name_len) then let
+        val h = _u32(cd, c + 42)
+        val cs = _u32(cd, c + 20)
+        val m = _u16(cd, c + 10)
+        val u = _u32(cd, c + 24)
+      in
+        if h < 0 then $R.none()
+        else if cs < 0 then $R.none()
+        else if u < 0 then $R.none()
+        else if h > z - 30 then $R.none()
+        else if m = 0 then $R.some(zip_ref_mk(h, cs, 0, u))
+        else if m = 8 then $R.some(zip_ref_mk(h, cs, 8, u))
+        else $R.none()
+      end
+      else if next > s then $R.none()
+      else loop(cd, s, next, r - 1, name)
+    end
+  val+ zip_cd_mk(_, s, d) = dir
+in loop(cd, s, 0, d, name) end
+
+implement find_data {l}{z} (hdr, r, z) = let
+  val+ zip_ref_mk(h, cs, m, u) = r
+in
+  if _u32(hdr, 0) <> 67324752 then $R.none()
+  else let
+    val d = h + 30 + _u16(hdr, 26) + _u16(hdr, 28)
+  in
+    if d > z - cs then $R.none()
+    else $R.some(zip_span_mk(d, cs, m, u))
+  end
+end
