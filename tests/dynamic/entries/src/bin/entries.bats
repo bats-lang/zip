@@ -280,6 +280,51 @@ fn _ranged_entry {l:agz}{l2:agz}{s:pos}{k:pos | k <= 1048576}
   val () = (if ok then () else println! ("FAIL ranged ", label))
 in ok end
 
+(* Whether cd's name [no, no + nl) is name, by cd_name_eq *)
+fn _cd_is {l:agz}{s:pos}{no:nat}{nl:pos | no + nl <= s}{k:pos | k <= 1048576}
+  (cd: !$A.arr(byte, l, s), no: int no, nl: int nl, name: string k): bool = let
+  val k = g1u2i(string1_length(name))
+  val nm = $A.alloc<byte>(k)
+  fun fill {l2:agz}{i:nat | i <= k} .<k - i>. (nm: !$A.arr(byte, l2, k), i: int i): void =
+    if i >= k then ()
+    else let
+      val () = $A.set<byte>(nm, i, $A.int2byte($AR.byte_of_char(string_get_at(name, i))))
+    in fill(nm, i + 1) end
+  val () = fill(nm, 0)
+  val @(f, b) = $A.freeze<byte>(nm)
+  val r = $Z.cd_name_eq(cd, no, nl, b, k)
+  val () = $A.drop<byte>(f, b)
+  val () = $A.free<byte>($A.thaw<byte>(f))
+in r end
+
+(* Whether cd_refs lists both entries in order, their names match by
+   cd_name_eq, and find_data_at finds a.txt's data at 35 *)
+fn _refs {l:agz}{l2:agz}{s:pos}
+  (a: !$A.arr(byte, l, 211), cd: !$A.arr(byte, l2, s), dir: !$Z.zip_cd(211, s)): bool = let
+  val ok = (case+ $Z.cd_refs(cd, dir, 211) of
+    | ~$R.none() => false
+    | ~$R.some(rs) => (case+ rs of
+      | ~$Z.zip_refs_cons(h1, cs1, m1, u1, no1, nl1, rest) => let
+          val hdr = _slice(a, h1, 30)
+          val d1 = (case+ $Z.find_data_at(hdr, h1, cs1, m1, u1, 211) of
+            | ~$R.some(~$Z.zip_span_mk(d, _, _, _)) => d
+            | ~$R.none() => ~1): int
+          val () = $A.free<byte>(hdr)
+          val ok1 = h1 = 0 && cs1 = 5 && m1 = 0 && u1 = 5 && no1 = 46 && nl1 = 5 && d1 = 35
+            && _cd_is(cd, no1, nl1, "a.txt") && ~_cd_is(cd, no1, nl1, "a.txv")
+        in
+          case+ rest of
+          | ~$Z.zip_refs_cons(h2, cs2, m2, u2, no2, nl2, rest2) => let
+              val ok2 = h2 = 40 && cs2 = 4 && m2 = 0 && u2 = 4 && no2 = 97 && nl2 = 9
+                && _cd_is(cd, no2, nl2, "dir/b.xml") && ~_cd_is(cd, no2, nl2, "a.txt")
+              val () = $Z.zip_refs_free(rest2)
+            in ok1 && ok2 end
+          | ~$Z.zip_refs_nil() => false
+        end
+      | ~$Z.zip_refs_nil() => false)): bool
+  val () = (if ok then () else println! ("FAIL cd_refs"))
+in ok end
+
 (* The central directory from the archive's last t bytes (read at
    211 - t), and both entries and a missing one through it *)
 fn _ranged {l:agz}{t:pos | t <= 211}
@@ -294,11 +339,12 @@ in
       val r1 = _ranged_entry("a.txt", a, cd, dir, "a.txt", 0, 129, 35, 5, 0, 5)
       val r2 = _ranged_entry("dir/b.xml", a, cd, dir, "dir/b.xml", 40, 180, 79, 4, 0, 4)
       val r3 = _ranged_entry("missing", a, cd, dir, "zz", ~1, 0, 0, 0, 0, 0)
+      val r4 = _refs(a, cd, dir)
       val () = $A.free<byte>(cd)
       val+ ~$Z.zip_cd_mk(c, s, d) = dir
       val ok = c = 83 && s = 106 && d = 2
       val () = (if ok then () else println! ("FAIL ranged find_cd"))
-    in ok && r1 && r2 && r3 end
+    in ok && r1 && r2 && r3 && r4 end
   | ~$R.none() => let
       val () = println! ("FAIL ranged find_cd: none")
     in false end
