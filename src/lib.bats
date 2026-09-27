@@ -15,24 +15,28 @@
 (* Ranged reading: an archive of z bytes need not be in memory at once.
    find_cd reads its end (the last t bytes), find_ref its central
    directory, find_data an entry's local header; each result names the
-   next range to read, proven inside the archive. *)
+   next range to read, proven inside the archive.
+
+   The results are linear: a datatype's cell is never freed (there is no
+   GC), so each is consumed by a ~ pattern (zip_cd_mk, zip_ref_mk,
+   zip_span_mk) when its caller is done with it. *)
 
 (* The central directory of a z-byte archive: [c, c + s), inside it,
    holding d entries *)
-#pub datatype zip_cd(z:int, s:int) =
+#pub datavtype zip_cd(z:int, s:int) =
   | {c:nat | c + s <= z}{d:nat | d < 65536} zip_cd_mk(z, s) of (int c, int s, int d)
 
 (* An entry of a z-byte archive, from its central directory: its local
    header at h, its compressed size s, method m (0 stored, 8 deflate),
    uncompressed size u, and its name [no, no + nl) in the archive (in the
    central directory; a name is at most 65535 bytes) *)
-#pub datatype zip_ref(z:int) =
+#pub datavtype zip_ref(z:int) =
   | {h:nat | h + 30 <= z}{s:nat}{m:int | m == 0 || m == 8}{u:nat}{no,nl:nat | no + nl <= z; nl < 65536}
     zip_ref_mk(z) of (int h, int s, int m, int u, int no, int nl)
 
 (* An entry's compressed data [d, d + s) inside a z-byte archive, its
    method and its uncompressed size *)
-#pub datatype zip_span(z:int) =
+#pub datavtype zip_span(z:int) =
   | {d,s:nat | d + s <= z}{m:int | m == 0 || m == 8}{u:nat}
     zip_span_mk(z) of (int d, int s, int m, int u)
 
@@ -53,25 +57,28 @@
   (tail: !$A.arr(byte, l, t), t: int t, z: int z): $R.option([s:pos] zip_cd(z, s))
 
 (* The directory's size *)
-#pub fun cd_size {z,s:int} (dir: zip_cd(z, s)): int s
+#pub fun cd_size {z,s:int} (dir: !zip_cd(z, s)): int s
 
 (* The directory's offset *)
-#pub fun cd_offset {z,s:int} (dir: zip_cd(z, s)): [c:nat | c + s <= z] int c
+#pub fun cd_offset {z,s:int} (dir: !zip_cd(z, s)): [c:nat | c + s <= z] int c
 
 (* The entry named name in the central directory cd (read from the
    directory's offset), or none when there is none or its local header
    is outside the archive or its method is neither 0 nor 8 *)
 #pub fun find_ref
   {l:agz}{z:int}{s:pos}{lb:agz}{nb:pos}
-  (cd: !$A.arr(byte, l, s), dir: zip_cd(z, s), z: int z,
+  (cd: !$A.arr(byte, l, s), dir: !zip_cd(z, s), z: int z,
    name: !$A.borrow(byte, lb, nb), name_len: int nb): $R.option(zip_ref(z))
+
+(* Where the entry's local header is *)
+#pub fun ref_header {z:int} (r: !zip_ref(z)): [h:nat | h + 30 <= z] int h
 
 (* The entry's compressed data, given hdr, its 30-byte local header (read
    from the ref's h), or none when hdr is not a local header or the data
    is outside the archive *)
 #pub fun find_data
   {l:agz}{z:int}
-  (hdr: !$A.arr(byte, l, 30), r: zip_ref(z), z: int z): $R.option(zip_span(z))
+  (hdr: !$A.arr(byte, l, 30), r: !zip_ref(z), z: int z): $R.option(zip_span(z))
 
 (* ============================================================
    Internal byte reading
@@ -138,12 +145,16 @@ in
 end
 
 implement cd_size {z,s} (dir) = let
-  val+ zip_cd_mk(_, n, _) = dir
-in n end
+  val+ @zip_cd_mk(_, n, _) = dir
+  val n1 = n
+  prval () = fold@(dir)
+in n1 end
 
 implement cd_offset {z,s} (dir) = let
-  val+ zip_cd_mk(c, _, _) = dir
-in c end
+  val+ @zip_cd_mk(c, _, _) = dir
+  val c1 = c
+  prval () = fold@(dir)
+in c1 end
 
 implement find_ref {l}{z}{s}{lb}{nb} (cd, dir, z, name, name_len) = let
   (* Entry record at c, with r entries left in the directory *)
@@ -175,11 +186,21 @@ implement find_ref {l}{z}{s}{lb}{nb} (cd, dir, z, name, name_len) = let
       else if next > s then $R.none()
       else loop(cd, s, co, next, r - 1, name)
     end
-  val+ zip_cd_mk(co, s, d) = dir
-in loop(cd, s, co, 0, d, name) end
+  val+ @zip_cd_mk(co, s, d) = dir
+  val co1 = co and s1 = s and d1 = d
+  prval () = fold@(dir)
+in loop(cd, s1, co1, 0, d1, name) end
+
+implement ref_header {z} (r) = let
+  val+ @zip_ref_mk(h, _, _, _, _, _) = r
+  val h1 = h
+  prval () = fold@(r)
+in h1 end
 
 implement find_data {l}{z} (hdr, r, z) = let
-  val+ zip_ref_mk(h, cs, m, u, _, _) = r
+  val+ @zip_ref_mk(h0, cs0, m0, u0, _, _) = r
+  val h = h0 and cs = cs0 and m = m0 and u = u0
+  prval () = fold@(r)
 in
   if _u32(hdr, 0) <> 67324752 then $R.none()
   else let
