@@ -1,0 +1,6 @@
+[package]
+name = "compression-left-out"
+kind = "lib"
+
+[dependencies]
+"zip" = ""

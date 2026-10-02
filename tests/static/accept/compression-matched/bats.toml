@@ -1,0 +1,8 @@
+[package]
+name = "compression-matched"
+kind = "lib"
+
+[dependencies]
+"array" = ""
+"result" = ""
+"zip" = ""

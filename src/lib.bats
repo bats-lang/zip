@@ -21,34 +21,41 @@
    GC), so each is consumed by a ~ pattern (zip_cd_mk, zip_ref_mk,
    zip_span_mk) when its caller is done with it. *)
 
+(* How an entry's data is stored, decoded once from its method field:
+   method 0 stores it as it is, method 8 deflates it (raw deflate). An
+   entry with any other method is left out, so no entry here has one. *)
+#pub datatype compression =
+  | Stored
+  | Deflated
+
 (* The central directory of a z-byte archive: [c, c + s), inside it,
    holding d entries *)
 #pub datavtype zip_cd(z:int, s:int) =
   | {c:nat | c + s <= z}{d:nat | d < 65536} zip_cd_mk(z, s) of (int c, int s, int d)
 
 (* An entry of a z-byte archive, from its central directory: its local
-   header at h, its compressed size s, method m (0 stored, 8 deflate),
+   header at h, its compressed size s, its compression,
    uncompressed size u, and its name [no, no + nl) in the archive (in the
    central directory; a name is 1 to 65535 bytes, the length of the name
    find_ref was given) *)
 #pub datavtype zip_ref(z:int) =
-  | {h:nat | h + 30 <= z}{s:nat}{m:int | m == 0 || m == 8}{u:nat}{no:nat}{nl:pos | no + nl <= z; nl < 65536}
-    zip_ref_mk(z) of (int h, int s, int m, int u, int no, int nl)
+  | {h:nat | h + 30 <= z}{s:nat}{u:nat}{no:nat}{nl:pos | no + nl <= z; nl < 65536}
+    zip_ref_mk(z) of (int h, int s, compression, int u, int no, int nl)
 
 (* An entry's compressed data [d, d + s) inside a z-byte archive, its
-   method and its uncompressed size *)
+   compression and its uncompressed size *)
 #pub datavtype zip_span(z:int) =
-  | {d,s:nat | d + s <= z}{m:int | m == 0 || m == 8}{u:nat}
-    zip_span_mk(z) of (int d, int s, int m, int u)
+  | {d,s:nat | d + s <= z}{u:nat}
+    zip_span_mk(z) of (int d, int s, compression, int u)
 
 (* The entries of the s-byte central directory of a z-byte archive,
    each record checked once, by cd_refs: an entry's local header at h,
-   its compressed size cs, method m, uncompressed size u, and its name
+   its compressed size cs, compression, uncompressed size u, and its name
    [no, no + nl) in the directory; k entries *)
 #pub datavtype zip_refs(z:int, s:int, k:int) =
   | zip_refs_nil(z, s, 0) of ()
-  | {k:nat}{h:nat | h + 30 <= z}{cs:nat}{m:int | m == 0 || m == 8}{u:nat}{no:nat}{nl:pos | no + nl <= s; nl < 65536}
-    zip_refs_cons(z, s, k + 1) of (int h, int cs, int m, int u, int no, int nl, zip_refs(z, s, k))
+  | {k:nat}{h:nat | h + 30 <= z}{cs:nat}{u:nat}{no:nat}{nl:pos | no + nl <= s; nl < 65536}
+    zip_refs_cons(z, s, k + 1) of (int h, int cs, compression, int u, int no, int nl, zip_refs(z, s, k))
 
 (* The most bytes at an archive's end that its end-of-central-directory
    record (22 bytes and a comment of at most 65535) spans *)
@@ -74,7 +81,8 @@
 
 (* The entry named name in the central directory cd (read from the
    directory's offset), or none when there is none or its local header
-   is outside the archive or its method is neither 0 nor 8 *)
+   is outside the archive or its method is neither 0 (stored) nor 8
+   (deflated) *)
 #pub fun find_ref
   {l:agz}{z:int}{s:pos}{lb:agz}{nb:pos}
   (cd: !$A.arr(byte, l, s), dir: !zip_cd(z, s), z: int z,
@@ -108,10 +116,11 @@
    name: !$A.borrow(byte, lb, nb), nb: int nb): bool
 
 (* find_data for the entry whose local header is at h, of compressed
-   size cs, method m and uncompressed size u (a zip_refs entry's) *)
+   size cs, compression method and uncompressed size u (a zip_refs
+   entry's) *)
 #pub fun find_data_at
-  {l:agz}{z:int}{h:nat | h + 30 <= z}{cs:nat}{m:int | m == 0 || m == 8}{u:nat}
-  (hdr: !$A.arr(byte, l, 30), h: int h, cs: int cs, m: int m, u: int u, z: int z): $R.option(zip_span(z))
+  {l:agz}{z:int}{h:nat | h + 30 <= z}{cs:nat}{u:nat}
+  (hdr: !$A.arr(byte, l, 30), h: int h, cs: int cs, method: compression, u: int u, z: int z): $R.option(zip_span(z))
 
 (* ============================================================
    Internal byte reading
@@ -136,6 +145,13 @@ fn _u32 {l:agz}{n:pos}{o:nat | o + 4 <= n}
   val b3 = _u8(arr, off + 3)
   val hi = (if b3 < 128 then b3 else b3 - 256): [h:int | ~128 <= h; h < 128] int h
 in lo + 16777216 * hi end
+
+(* The compression a method field names, or none for a method this
+   reader does not take: the one place the field's numbers are read *)
+fn _compression_of (method: int): $R.option(compression) =
+  if method = 0 then $R.some(Stored())
+  else if method = 8 then $R.some(Deflated())
+  else $R.none()
 
 (* ============================================================
    Internal: compare array region with borrow
@@ -207,16 +223,17 @@ implement find_ref {l}{z}{s}{lb}{nb} (cd, dir, z, name, name_len) = let
       else if _name_eq(cd, c + 46, name, name_len) then let
         val h = _u32(cd, c + 42)
         val cs = _u32(cd, c + 20)
-        val m = _u16(cd, c + 10)
+        val method = _compression_of(_u16(cd, c + 10))
         val u = _u32(cd, c + 24)
       in
-        if h < 0 then $R.none()
-        else if cs < 0 then $R.none()
-        else if u < 0 then $R.none()
-        else if h > z - 30 then $R.none()
-        else if m = 0 then $R.some(zip_ref_mk(h, cs, 0, u, co + c + 46, nl))
-        else if m = 8 then $R.some(zip_ref_mk(h, cs, 8, u, co + c + 46, nl))
-        else $R.none()
+        case+ method of
+        | ~$R.none() => $R.none()
+        | ~$R.some(method) =>
+          if h < 0 then $R.none()
+          else if cs < 0 then $R.none()
+          else if u < 0 then $R.none()
+          else if h > z - 30 then $R.none()
+          else $R.some(zip_ref_mk(h, cs, method, u, co + c + 46, nl))
       end
       else if next > s then $R.none()
       else loop(cd, s, co, next, r - 1, name)
@@ -232,20 +249,20 @@ implement ref_header {z} (r) = let
   prval () = fold@(r)
 in h1 end
 
-implement find_data_at {l}{z}{h}{cs}{m}{u} (hdr, h, cs, m, u, z) =
+implement find_data_at {l}{z}{h}{cs}{u} (hdr, h, cs, method, u, z) =
   if _u32(hdr, 0) <> 67324752 then $R.none()
   else let
     val d = h + 30 + _u16(hdr, 26) + _u16(hdr, 28)
   in
     if d > z - cs then $R.none()
-    else $R.some(zip_span_mk(d, cs, m, u))
+    else $R.some(zip_span_mk(d, cs, method, u))
   end
 
 implement find_data {l}{z} (hdr, r, z) = let
-  val+ @zip_ref_mk(h0, cs0, m0, u0, _, _) = r
-  val h = h0 and cs = cs0 and m = m0 and u = u0
+  val+ @zip_ref_mk(h0, cs0, method0, u0, _, _) = r
+  val h = h0 and cs = cs0 and method = method0 and u = u0
   prval () = fold@(r)
-in find_data_at(hdr, h, cs, m, u, z) end
+in find_data_at(hdr, h, cs, method, u, z) end
 
 implement cd_refs {l}{z}{s} (cd, dir, z) = let
   (* rs reversed onto acc *)
@@ -270,17 +287,18 @@ implement cd_refs {l}{z}{s} (cd, dir, z) = let
       else let
         val h = _u32(cd, c + 42)
         val cs = _u32(cd, c + 20)
-        val m = _u16(cd, c + 10)
+        val method = _compression_of(_u16(cd, c + 10))
         val u = _u32(cd, c + 24)
       in
-        if nl <= 0 then loop(cd, s, next, r - 1, acc)
-        else if h < 0 then loop(cd, s, next, r - 1, acc)
-        else if cs < 0 then loop(cd, s, next, r - 1, acc)
-        else if u < 0 then loop(cd, s, next, r - 1, acc)
-        else if h > z - 30 then loop(cd, s, next, r - 1, acc)
-        else if m = 0 then loop(cd, s, next, r - 1, zip_refs_cons(h, cs, 0, u, c + 46, nl, acc))
-        else if m = 8 then loop(cd, s, next, r - 1, zip_refs_cons(h, cs, 8, u, c + 46, nl, acc))
-        else loop(cd, s, next, r - 1, acc)
+        case+ method of
+        | ~$R.none() => loop(cd, s, next, r - 1, acc)
+        | ~$R.some(method) =>
+          if nl <= 0 then loop(cd, s, next, r - 1, acc)
+          else if h < 0 then loop(cd, s, next, r - 1, acc)
+          else if cs < 0 then loop(cd, s, next, r - 1, acc)
+          else if u < 0 then loop(cd, s, next, r - 1, acc)
+          else if h > z - 30 then loop(cd, s, next, r - 1, acc)
+          else loop(cd, s, next, r - 1, zip_refs_cons(h, cs, method, u, c + 46, nl, acc))
       end
     end
   val+ @zip_cd_mk(_, s, d) = dir
