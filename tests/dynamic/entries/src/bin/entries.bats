@@ -258,12 +258,32 @@ fn _ref {l:agz}{s:pos}{k:pos | k <= 1048576}
   val () = $A.free<byte>($A.thaw<byte>(f))
 in r end
 
-(* Whether the entry named name is found by reading only its ranges:
-   header at h, name at no, data [d, d + s), method m, size u (h = ~1:
-   no entry, or no data inside the archive) *)
+(* What reading an entry by its ranges should find: no entry (or no data
+   inside the archive), or one whose header is at h, name at no, data
+   [d, d + cs), compressed as said, of size u. Linear: EntryAt is a cell,
+   freed when it is matched. *)
+datavtype expected_entry =
+  | NoEntry
+  | EntryAt of (int, int, int, int, $Z.compression, int)
+
+fn _same_compression (found: $Z.compression, expected: $Z.compression): bool =
+  case+ (found, expected) of
+  | ($Z.Stored(), $Z.Stored()) => true
+  | ($Z.Deflated(), $Z.Deflated()) => true
+  | ($Z.Stored(), $Z.Deflated()) => false
+  | ($Z.Deflated(), $Z.Stored()) => false
+
+(* Whether nothing was expected *)
+fn _no_entry (expected: expected_entry): bool =
+  case+ expected of
+  | ~NoEntry() => true
+  | ~EntryAt(_, _, _, _, _, _) => false
+
+(* Whether the entry named name is found by reading only its ranges,
+   as expected *)
 fn _ranged_entry {l:agz}{l2:agz}{s:pos}{k:pos | k <= 1048576}
   (label: string, a: !$A.arr(byte, l, 211), cd: !$A.arr(byte, l2, s), dir: !$Z.zip_cd(211, s),
-   name: string k, h: int, no: int, d: int, cs: int, m: int, u: int): bool = let
+   name: string k, expected: expected_entry): bool = let
   val ok = (case+ _ref(cd, dir, name) of
     | ~$R.some(r) => let
         val hdr = _slice(a, $Z.ref_header(r), 30)
@@ -272,11 +292,13 @@ fn _ranged_entry {l:agz}{l2:agz}{s:pos}{k:pos | k <= 1048576}
         val+ ~$Z.zip_ref_mk(h2, _, _, _, no2, nl2) = r
       in
         case+ span of
-        | ~$R.some(~$Z.zip_span_mk(d2, s2, m2, u2)) =>
-            h2 = h && no2 = no && nl2 = g1u2i(string1_length(name)) && d2 = d && s2 = cs && m2 = m && u2 = u
-        | ~$R.none() => h = ~1
+        | ~$R.some(~$Z.zip_span_mk(d2, s2, m2, u2)) => (case+ expected of
+          | ~EntryAt(h, no, d, cs, m, u) =>
+            h2 = h && no2 = no && nl2 = g1u2i(string1_length(name)) && d2 = d && s2 = cs && _same_compression(m2, m) && u2 = u
+          | ~NoEntry() => false)
+        | ~$R.none() => _no_entry(expected)
       end
-    | ~$R.none() => h = ~1): bool
+    | ~$R.none() => _no_entry(expected)): bool
   val () = (if ok then () else println! ("FAIL ranged ", label))
 in ok end
 
@@ -310,12 +332,12 @@ fn _refs {l:agz}{l2:agz}{s:pos}
             | ~$R.some(~$Z.zip_span_mk(d, _, _, _)) => d
             | ~$R.none() => ~1): int
           val () = $A.free<byte>(hdr)
-          val ok1 = h1 = 0 && cs1 = 5 && m1 = 0 && u1 = 5 && no1 = 46 && nl1 = 5 && d1 = 35
+          val ok1 = h1 = 0 && cs1 = 5 && _same_compression(m1, $Z.Stored()) && u1 = 5 && no1 = 46 && nl1 = 5 && d1 = 35
             && _cd_is(cd, no1, nl1, "a.txt") && ~_cd_is(cd, no1, nl1, "a.txv")
         in
           case+ rest of
           | ~$Z.zip_refs_cons(h2, cs2, m2, u2, no2, nl2, rest2) => let
-              val ok2 = h2 = 40 && cs2 = 4 && m2 = 0 && u2 = 4 && no2 = 97 && nl2 = 9
+              val ok2 = h2 = 40 && cs2 = 4 && _same_compression(m2, $Z.Stored()) && u2 = 4 && no2 = 97 && nl2 = 9
                 && _cd_is(cd, no2, nl2, "dir/b.xml") && ~_cd_is(cd, no2, nl2, "a.txt")
               val () = $Z.zip_refs_free(rest2)
             in ok1 && ok2 end
@@ -336,9 +358,9 @@ in
   case+ found of
   | ~$R.some(dir) => let
       val cd = _slice(a, $Z.cd_offset(dir), $Z.cd_size(dir))
-      val r1 = _ranged_entry("a.txt", a, cd, dir, "a.txt", 0, 129, 35, 5, 0, 5)
-      val r2 = _ranged_entry("dir/b.xml", a, cd, dir, "dir/b.xml", 40, 180, 79, 4, 0, 4)
-      val r3 = _ranged_entry("missing", a, cd, dir, "zz", ~1, 0, 0, 0, 0, 0)
+      val r1 = _ranged_entry("a.txt", a, cd, dir, "a.txt", EntryAt(0, 129, 35, 5, $Z.Stored(), 5))
+      val r2 = _ranged_entry("dir/b.xml", a, cd, dir, "dir/b.xml", EntryAt(40, 180, 79, 4, $Z.Stored(), 4))
+      val r3 = _ranged_entry("missing", a, cd, dir, "zz", NoEntry())
       val r4 = _refs(a, cd, dir)
       val () = $A.free<byte>(cd)
       val+ ~$Z.zip_cd_mk(c, s, d) = dir
@@ -372,13 +394,46 @@ in
       val c = $Z.cd_offset(dir)
       val s = $Z.cd_size(dir)
       val cd = _slice(a, c, s)
-      val r1 = _ranged_entry("oversized a.txt", a, cd, dir, "a.txt", ~1, 0, 0, 0, 0, 0)
-      val r2 = _ranged_entry("dir/b.xml after", a, cd, dir, "dir/b.xml", 40, 180, 79, 4, 0, 4)
+      val r1 = _ranged_entry("oversized a.txt", a, cd, dir, "a.txt", NoEntry())
+      val r2 = _ranged_entry("dir/b.xml after", a, cd, dir, "dir/b.xml", EntryAt(40, 180, 79, 4, $Z.Stored(), 4))
       val () = $A.free<byte>(cd)
       val+ ~$Z.zip_cd_mk(_, _, _) = dir
     in r1 && r2 end
   | ~$R.none() => false
 end
+
+(* With a.txt's method field (CD offset 83 + 10) set to method: a.txt is
+   found as expected, and dir/b.xml still is *)
+fn _with_method {l:agz}
+  (label: string, a: !$A.arr(byte, l, 211), method: int, expected: expected_entry): bool = let
+  val () = $A.set<byte>(a, 93, $A.int2byte($AR.low_byte(method)))
+  val tail = _slice(a, 0, 211)
+  val found = $Z.find_cd(tail, 211, 211)
+  val () = $A.free<byte>(tail)
+  val ok = (case+ found of
+    | ~$R.some(dir) => let
+        val cd = _slice(a, $Z.cd_offset(dir), $Z.cd_size(dir))
+        val listed_count = (case+ expected of NoEntry() => 1 | EntryAt(_, _, _, _, _, _) => 2): int
+        val r1 = _ranged_entry(label, a, cd, dir, "a.txt", expected)
+        val r2 = _ranged_entry("dir/b.xml beside it", a, cd, dir, "dir/b.xml", EntryAt(40, 180, 79, 4, $Z.Stored(), 4))
+        val count = (case+ $Z.cd_refs(cd, dir, 211) of
+          | ~$R.some(rs) => let
+              fun length {s:int}{k:nat} .<k>. (rs: $Z.zip_refs(211, s, k)): int =
+                case+ rs of
+                | ~$Z.zip_refs_nil() => 0
+                | ~$Z.zip_refs_cons(_, _, _, _, _, _, rest) => 1 + length(rest)
+            in length(rs) end
+          | ~$R.none() => ~1): int
+        val listed = count = listed_count
+        val () = (if listed then () else println! ("FAIL ", label, ": cd_refs lists ", count))
+        val () = $A.free<byte>(cd)
+        val+ ~$Z.zip_cd_mk(_, _, _) = dir
+      in r1 && r2 && listed end
+    | ~$R.none() => let
+        val () = (case+ expected of ~NoEntry() => () | ~EntryAt(_, _, _, _, _, _) => ())
+      in false end): bool
+  val () = $A.set<byte>(a, 93, $A.int2byte(0))
+in ok end
 
 implement main0 () = let
   val a = _archive()
@@ -390,6 +445,10 @@ implement main0 () = let
      40, its name at 180 and its 4 bytes at 79. *)
   val t0a = _ranged(a, 211)
   val t0b = _ranged(a, 150)
+  (* a.txt's method set to 8 is deflated; to 5, which no reader here
+     takes, it is left out by find_ref and cd_refs. Then back to 0. *)
+  val t0c = _with_method("deflated a.txt", a, 8, EntryAt(0, 129, 35, 5, $Z.Deflated(), 5))
+  val t0d = _with_method("a.txt of method 5", a, 5, NoEntry())
   (* a.txt's compressed size (CD offset 83 + 20) set to 0xFFFFFFFF: its
      data would run past the archive, so it is not found; dir/b.xml
      still is. *)
@@ -400,7 +459,7 @@ implement main0 () = let
   val () = _ff(a, 205)
   val t2 = _no_cd("corrupt cd offset", a)
   val () = $A.free<byte>(a)
-  val ok = t0a && t0b && t1 && t2
+  val ok = t0a && t0b && t0c && t0d && t1 && t2
 in
   if ok then println! ("entries: all cases pass")
   else exit_void(1)
