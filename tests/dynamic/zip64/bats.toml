@@ -1,0 +1,10 @@
+[package]
+name = "zip64"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"str" = ""
+"zip" = ""
