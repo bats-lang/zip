@@ -58,8 +58,10 @@
     zip_refs_cons(z, s, k + 1) of (int h, int cs, compression, int u, int no, int nl, zip_refs(z, s, k))
 
 (* The most bytes at an archive's end that its end-of-central-directory
-   record (22 bytes and a comment of at most 65535) spans *)
-#pub stadef ZIP_TAIL_MAX = 65557
+   record (22 bytes and a comment of at most 65535) spans, and, before
+   it, a ZIP64 end of central directory locator (20 bytes) and the
+   ZIP64 record it names (56 bytes, with no extensible data) *)
+#pub stadef ZIP_TAIL_MAX = 65633
 
 (* ============================================================
    Public API
@@ -68,7 +70,15 @@
 (* The central directory of a z-byte archive whose last t bytes are tail
    (read from offset z - t; t = min(z, ZIP_TAIL_MAX) finds any record),
    or none when tail holds no end-of-central-directory record or the
-   directory it names is empty or outside the archive *)
+   directory it names is empty or outside the archive.
+
+   An archive in ZIP64 form (APPNOTE 4.3.14 and 4.3.15) is read: when the
+   end record's entry count is 0xFFFF or its directory size or offset
+   0xFFFFFFFF, and the 20 bytes before it are a ZIP64 locator, the
+   ZIP64 end record the locator names (inside tail) gives the real
+   values, as libzip and Python's zipfile read them. A ZIP64 record
+   whose values are 2^32 or more, which has 65536 entries or more, or
+   lies outside tail, names no directory (none). *)
 #pub fun find_cd
   {l:agz}{t:pos}{z:int | t <= z}
   (tail: !$A.arr(byte, l, t), t: int t, z: int z): $R.option([s:pos] zip_cd(z, s))
@@ -102,7 +112,10 @@
    offset), in order, or none when a record is not an entry record or
    runs past the directory. An entry that find_ref could never return
    (an empty name, a local header outside the archive, a method neither
-   0 nor 8, a negative size) is left out. *)
+   0 nor 8, a negative size) is left out. An entry whose sizes or offset
+   are 0xFFFFFFFF has the real ones in its ZIP64 extra field (id 1,
+   APPNOTE 4.5.3); a value of 2^31 or more is left out as a negative
+   one is. *)
 #pub fun cd_refs
   {l:agz}{z:int}{s:pos}
   (cd: !$A.arr(byte, l, s), dir: !zip_cd(z, s), z: int z): $R.option([k:nat] zip_refs(z, s, k))
@@ -153,6 +166,67 @@ fn _compression_of (method: int): $R.option(compression) =
   else if method = 8 then $R.some(Deflated())
   else $R.none()
 
+
+(* The 64-bit little endian number at o of arr, when o + 8 <= limit <= n
+   and its high half is 0 and its low half is at most 2^31 - 1; else -1 *)
+fn _u64 {l:agz}{n:pos}{o,limit:int} (arr: !$A.arr(byte, l, n), n: int n, o: int o, limit: int limit): [v:int] int v =
+  if o < 0 then ~1
+  else if o + 8 > limit then ~1
+  else if o + 8 > n then ~1
+  else let
+    val low = _u32(arr, o)
+    val high = _u32(arr, o + 4)
+  in
+    if high <> 0 then ~1
+    else if low < 0 then ~1
+    else low
+  end
+
+(* The data [start, limit) of the ZIP64 extended information extra field
+   (id 1) in arr[p, u), as its start and end, or -1 and -1 when there is
+   none or a field runs past u *)
+fun _extra_zip64 {l:agz}{n:pos}{u:nat | u <= n}{p:nat | p <= u} .<u - p>.
+  (arr: !$A.arr(byte, l, n), n: int n, p: int p, u: int u): [a,b:int] @(int a, int b) =
+  if p + 4 > u then @(~1, ~1)
+  else let
+    val id = _u16(arr, p)
+    val size = _u16(arr, p + 2)
+    val next = p + 4 + size
+  in
+    if next > u then @(~1, ~1)
+    else if id = 1 then @(p + 4, next)
+    else _extra_zip64(arr, n, next, u)
+  end
+
+(* An entry record at c of the s-byte directory cd (its 46 bytes inside
+   it): its uncompressed size, compressed size and local header's offset.
+   A field of 0xFFFFFFFF (-1 here) is the next 8 bytes of the record's
+   ZIP64 extra field, in that order, present for the saturated fields
+   only (APPNOTE 4.5.3); -1 when it is not there or does not fit. *)
+fn _entry_fields64 {l:agz}{s:pos}{c:nat | c + 46 <= s}{u0,cs0,h0:int}
+  (cd: !$A.arr(byte, l, s), s: int s, c: int c, u0: int u0, cs0: int cs0, h0: int h0): [u,cs,h:int] @(int u, int cs, int h) = let
+  val extra_start = c + 46 + _u16(cd, c + 28)
+  val extra_end = extra_start + _u16(cd, c + 30)
+  val @(start, limit) = (if extra_end > s then @(~1, ~1) else _extra_zip64(cd, s, extra_start, extra_end)): [a,b:int] @(int a, int b)
+  val u1 = (if u0 = ~1 then _u64(cd, s, start, limit) else u0): [v:int] int v
+  val after_u = (if u0 = ~1 then start + 8 else start): [a:int] int a
+  val cs1 = (if cs0 = ~1 then _u64(cd, s, after_u, limit) else cs0): [v:int] int v
+  val after_cs = (if cs0 = ~1 then after_u + 8 else after_u): [a:int] int a
+  val h1 = (if h0 = ~1 then _u64(cd, s, after_cs, limit) else h0): [v:int] int v
+in @(u1, cs1, h1) end
+
+fn _entry_fields {l:agz}{s:pos}{c:nat | c + 46 <= s}
+  (cd: !$A.arr(byte, l, s), s: int s, c: int c): [u,cs,h:int] @(int u, int cs, int h) = let
+  val u0 = _u32(cd, c + 24)
+  val cs0 = _u32(cd, c + 20)
+  val h0 = _u32(cd, c + 42)
+in
+  if u0 = ~1 then _entry_fields64(cd, s, c, u0, cs0, h0)
+  else if cs0 = ~1 then _entry_fields64(cd, s, c, u0, cs0, h0)
+  else if h0 = ~1 then _entry_fields64(cd, s, c, u0, cs0, h0)
+  else @(u0, cs0, h0)
+end
+
 (* ============================================================
    Internal: compare array region with borrow
    ============================================================ *)
@@ -173,6 +247,42 @@ in loop(data, name, 0) end
    Implementations
    ============================================================ *)
 
+(* The directory the classic end record's fields name *)
+fn _classic {z:int}{d:nat | d < 65536}{s,c:int} (z: int z, d: int d, s: int s, c: int c): $R.option([size:pos] zip_cd(z, size)) =
+  if c < 0 then $R.none()
+  else if s <= 0 then $R.none()
+  else if c > z - s then $R.none()
+  else $R.some(zip_cd_mk(c, s, d))
+
+(* The central directory a ZIP64 end of central directory record gives, for
+   the end record at e of tail[0, t) (the ZIP64 locator is the 20 bytes
+   before it, the record is where the locator says, inside tail) *)
+fn _find_cd64 {l:agz}{t:pos}{z:int | t <= z}{e:nat | e + 22 <= t}
+  (tail: !$A.arr(byte, l, t), t: int t, z: int z, e: int e): $R.option([s:pos] zip_cd(z, s)) =
+  if e < 20 then $R.none()
+  else if _u32(tail, e - 20) <> 117853008 then $R.none()
+  else let
+    val record_at = _u64(tail, t, e - 12, e)
+    val q = record_at - (z - t)
+  in
+    if record_at < 0 then $R.none()
+    else if q < 0 then $R.none()
+    else if q + 56 > e - 20 then $R.none()
+    else if _u32(tail, q) <> 101075792 then $R.none()
+    else let
+      val d = _u64(tail, t, q + 32, q + 56)
+      val s = _u64(tail, t, q + 40, q + 56)
+      val c = _u64(tail, t, q + 48, q + 56)
+    in
+      if d < 0 then $R.none()
+      else if d >= 65536 then $R.none()
+      else if c < 0 then $R.none()
+      else if s <= 0 then $R.none()
+      else if c > z - s then $R.none()
+      else $R.some(zip_cd_mk(c, s, d))
+    end
+  end
+
 implement find_cd {l}{t}{z} (tail, t, z) = let
   (* Scan backwards from the last position a record fits *)
   fun loop {i:int | i >= ~1; i + 22 <= t} .<i + 1>.
@@ -183,10 +293,14 @@ implement find_cd {l}{t}{z} (tail, t, z) = let
       val s = _u32(tail, i + 12)
       val c = _u32(tail, i + 16)
     in
-      if c < 0 then $R.none()
-      else if s <= 0 then $R.none()
-      else if c > z - s then $R.none()
-      else $R.some(zip_cd_mk(c, s, d))
+      (* a field at its maximum may be the real value, or may say that the
+         ZIP64 record has it: the locator before the end record tells *)
+      if d = 65535 || s = ~1 || c = ~1 then
+        (if i >= 20 then
+           (if _u32(tail, i - 20) = 117853008 then _find_cd64(tail, t, z, i)
+            else _classic(z, d, s, c))
+         else _classic(z, d, s, c))
+      else _classic(z, d, s, c)
     end
     else loop(tail, i - 1)
 in
@@ -221,10 +335,8 @@ implement find_ref {l}{z}{s}{lb}{nb} (cd, dir, z, name, name_len) = let
       else if nl <> name_len then
         (if next > s then $R.none() else loop(cd, s, co, next, r - 1, name))
       else if _name_eq(cd, c + 46, name, name_len) then let
-        val h = _u32(cd, c + 42)
-        val cs = _u32(cd, c + 20)
+        val @(u, cs, h) = _entry_fields(cd, s, c)
         val method = _compression_of(_u16(cd, c + 10))
-        val u = _u32(cd, c + 24)
       in
         case+ method of
         | ~$R.none() => $R.none()
@@ -285,10 +397,8 @@ implement cd_refs {l}{z}{s} (cd, dir, z) = let
     in
       if next > s then let val () = zip_refs_free(acc) in $R.none() end
       else let
-        val h = _u32(cd, c + 42)
-        val cs = _u32(cd, c + 20)
+        val @(u, cs, h) = _entry_fields(cd, s, c)
         val method = _compression_of(_u16(cd, c + 10))
-        val u = _u32(cd, c + 24)
       in
         case+ method of
         | ~$R.none() => loop(cd, s, next, r - 1, acc)
