@@ -1,0 +1,8 @@
+[package]
+name = "inflates-functional-other-input"
+kind = "lib"
+
+[dependencies]
+"array" = ""
+"result" = ""
+"zip" = ""

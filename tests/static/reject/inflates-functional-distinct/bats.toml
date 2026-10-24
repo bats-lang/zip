@@ -1,0 +1,8 @@
+[package]
+name = "inflates-functional-distinct"
+kind = "lib"
+
+[dependencies]
+"array" = ""
+"result" = ""
+"zip" = ""

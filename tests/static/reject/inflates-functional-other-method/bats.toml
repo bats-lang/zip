@@ -1,0 +1,8 @@
+[package]
+name = "inflates-functional-other-method"
+kind = "lib"
+
+[dependencies]
+"array" = ""
+"result" = ""
+"zip" = ""
