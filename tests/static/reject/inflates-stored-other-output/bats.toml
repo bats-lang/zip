@@ -1,0 +1,8 @@
+[package]
+name = "inflates-stored-other-output"
+kind = "lib"
+
+[dependencies]
+"array" = ""
+"result" = ""
+"zip" = ""

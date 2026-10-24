@@ -1,0 +1,8 @@
+[package]
+name = "inflates-stored-use"
+kind = "lib"
+
+[dependencies]
+"array" = ""
+"result" = ""
+"zip" = ""

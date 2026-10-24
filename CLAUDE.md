@@ -28,3 +28,23 @@ that would move instead of moving it: move it in a pull request of its
 own. A pull request that needs newer packages runs `bats lock
 --repository <dir>` and commits `bats.lock` (and
 `.github/repository-version`) with the change.
+
+## INFLATES: what inflating an entry's data gives, as a relation (bats-lang/quire#608)
+
+`INFLATES(kind, compressed, output)` says that an entry's data, whose array
+cells are `compressed` (array's `cells`), inflates by the method `kind`
+(`inflate_stored`, `inflate_deflated`, the static form of `compression`) to
+the cells `output`. `inflates_functional` is its lemma: the same method and
+compressed cells give the same output cells, concluded as `CELLS_EQ`.
+
+Only the stored method (ZIP method 0, bytes kept as they are) has a
+constructor so far. The Deflated method is RFC 1951 and is added by the
+pieces that follow in quire#608 (zip#64 to #71), constructor by constructor,
+each extending `inflates_functional`. This piece adds new names only: no
+published signature changed. Proved, not tested: the relation is a
+specification, so there is nothing to run; `tests/static/accept/inflates-stored-use`
+uses it and `tests/static/reject/inflates-*` reject a stored entry inflating
+to other cells or claimed deflated, and the lemma used for other compressed
+cells, another method, or to conclude the outputs differ. The lemma's two
+mutants (`tests/static/mutation_check.py` of quire, over `src/lib.bats`, the
+GMP solver) are both rejected.

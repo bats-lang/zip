@@ -1,0 +1,1 @@
+src/lib.bats: 419(line=8, offs=29) -- 420(line=8, offs=30): error(3): the dynamic expression cannot be assigned the type [S2Eapp(S2Ecst(INFLATES); S2Eapp(S2Ecst(inflate_stored); ), S2Evar(cs(11547)), S2EVar(7788))].

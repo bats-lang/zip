@@ -425,3 +425,36 @@ in free(rs) end
 
 implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
   if nl <> nb then false else _name_eq(cd, no, name, nb)
+
+(* ============================================================
+   What inflating an entry's data gives, as a relation (quire#608, INFLATES)
+   ============================================================ *)
+
+(* How an entry's data is stored, as a static index: the method field 0
+   (stored) or 8 (deflated), as `compression` is its dynamic form *)
+#pub datasort inflate_kind =
+  | inflate_stored of ()
+  | inflate_deflated of ()
+
+(* cells and cells are the same cells: the one constructor is the only way
+   to have it, so a lemma's conclusion that two outputs are the same is
+   this *)
+#pub dataprop CELLS_EQ($A.cells, $A.cells) =
+  | {cs:$A.cells} CELLS_EQ_refl(cs, cs)
+
+(* INFLATES(kind, compressed, output): the entry's data, whose cells are
+   compressed, inflates to the cells output by the method kind. The stored
+   method (APPNOTE 4.4.5, method 0) keeps the bytes as they are. The
+   Deflated method's constructors are added by the pieces of quire#608
+   that follow (RFC 1951) *)
+#pub dataprop INFLATES(inflate_kind, $A.cells, $A.cells) =
+  | {cs:$A.cells} INFLATES_stored(inflate_stored(), cs, cs)
+
+(* The same compressed cells, by the same method, inflate to the same
+   output cells *)
+#pub prfun inflates_functional {kind:inflate_kind}{compressed,first,second:$A.cells}
+  (INFLATES(kind, compressed, first), INFLATES(kind, compressed, second)): CELLS_EQ(first, second)
+
+primplement inflates_functional {kind}{compressed,first,second} (first_proof, second_proof) =
+  case+ first_proof of
+  | INFLATES_stored() => (case+ second_proof of INFLATES_stored() => CELLS_EQ_refl())

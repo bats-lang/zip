@@ -1,0 +1,1 @@
+src/lib.bats: 415(line=8, offs=3) -- 443(line=8, offs=31): error(3): unsolved constraint: C3NSTRprop(C3TKmain(); S2Eeqeq(S2Evar(second(11549)); S2Eapp(S2Ecst(ccons); S2Eintinf(0), S2Evar(second(11549)))))
