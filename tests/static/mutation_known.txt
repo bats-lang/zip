@@ -1,0 +1,4 @@
+# file | lemma | operator | reason: accepted mutants that are explained (quire's mutation_check.py --known).
+# No entry: inflates_functional's two mutants (its second and its first output replaced by a fresh
+# variable) are both rejected, so no mutant of this package is accepted. A lemma whose conclusion is
+# `[false] void` would be listed here with a reject fixture beside it.
