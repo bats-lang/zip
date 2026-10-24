@@ -45,6 +45,30 @@ published signature changed. Proved, not tested: the relation is a
 specification, so there is nothing to run; `tests/static/accept/inflates-stored-use`
 uses it and `tests/static/reject/inflates-*` reject a stored entry inflating
 to other cells or claimed deflated, and the lemma used for other compressed
-cells, another method, or to conclude the outputs differ. The lemma's two
-mutants (`tests/static/mutation_check.py` of quire, over `src/lib.bats`, the
-GMP solver) are both rejected.
+cells, another method, or to conclude the outputs differ. The lemma is
+mutation-checked (next section).
+
+## The lemmas are mutation-checked under the infinite-precision solver (bats-lang/quire#594)
+
+The 32-bit solver can make a proof's context contradictory, so a lemma proves
+nothing while every other check is green. Every lemma of `src/lib.bats` (today
+`inflates_functional`; `CELLS_EQ` and `INFLATES` are dataprops, `prval ... fold@`
+is not a lemma) is checked with false variants of its statement, which the
+compiler must reject: quire's `tests/static/mutation_check.py`, from a clone of
+bats-lang/quire, with the GMP build of ATS2 as `--ats-home` (CI's solver: the
+bats setup action runs `bats ats2 install`). Every control is accepted and every
+mutant rejected. An accepted mutant is a vacuous lemma (file it as a p1) or an
+equivalent mutant listed with its reason in `tests/static/mutation_known.txt`;
+a lemma concluding `[false] void` has no false variant and gets a reject fixture
+in `tests/static/reject` instead (run by `tests/static/run.sh` in CI). A new
+lemma, or a new constructor of `INFLATES` that changes the lemma's body (zip#64
+to #71), is run through the checker again:
+
+```
+BATS_CHECK="bats check --repository REPO" python3 -B -I quire/tests/static/mutation_check.py \
+  --root . --run WORK --ats-home GMP_HOME/.bats/ats2 --inplace \
+  --known tests/static/mutation_known.txt src/lib.bats
+```
+
+`WORK` is a copy of the checkout that `bats check` has already passed (its
+`build/` kept); the checkout itself is not written.
