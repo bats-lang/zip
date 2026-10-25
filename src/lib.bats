@@ -843,46 +843,77 @@ primplement inflates_functional {kind}{compressed,first,second} (first_proof, se
   (WINDOW(output, window), COPY(output, distance, length, after)): WINDOW_AFTER_COPY(window, distance, length, after)
 
 (* ============================================================
+   The input in chunks: how a buffer relates to the consumed prefix (zip#64)
+   ============================================================ *)
+
+(* The compressed bytes are read from a reader in chunks (bats-lang/file#76,
+   item 5). Its index is the cells consumed so far, and at the end of the
+   file it closes, as the whole compressed sequence the proof talks about.
+   Bits read from a prefix are bits of the whole sequence: *)
+#pub prfun bits_in_prefix {prefix,rest,whole:$A.cells}{p,width,value:nat}
+  (APPEND(prefix, rest, whole), BITS(prefix, p, width, value)): BITS(whole, p, width, value)
+#pub prfun hbits_in_prefix {prefix,rest,whole:$A.cells}{p,width,code:nat}
+  (APPEND(prefix, rest, whole), HBITS(prefix, p, width, code)): HBITS(whole, p, width, code)
+
+(* BUFFER_AT(previous, chunk, consumed, start): the chunk in the decoder's
+   buffer was the last read, consumed is the cells before it and the chunk,
+   and the buffer's cell i is cell start + i of the consumed cells *)
+#pub dataprop BUFFER_AT($A.cells, $A.cells, $A.cells, int) =
+  | {previous,chunk,consumed:$A.cells}{start:nat} BUFFER_AT_mk(previous, chunk, consumed, start) of ($A.CLEN(previous, start), APPEND(previous, chunk, consumed))
+
+#pub prfun buffer_nth {previous,chunk,consumed:$A.cells}{start,index,value:nat}
+  (BUFFER_AT(previous, chunk, consumed, start), $A.NTH(chunk, index, value)): $A.NTH(consumed, start + index, value)
+
+(* RESERVOIR(consumed, p, count, value): the bit reservoir the decoder holds
+   across chunks is the count bits from bit p of the consumed cells *)
+#pub dataprop RESERVOIR($A.cells, int, int, int) =
+  | {consumed:$A.cells}{p,count,value:nat} RESERVOIR_mk(consumed, p, count, value) of BITS(consumed, p, count, value)
+
+(* ============================================================
    The decoders that return the proof (zip#64)
    ============================================================ *)
 
-(* The decoders stream the output to a file writer and keep only the
-   window. They are written against the writer bats-lang/file#76 asks for,
-   whose names this declares against (the zip pull request relocks to the
-   published file package):
-     $F.content_writer(written): linear, the cells written so far;
-     $F.content_writer_create(fd): content_writer(cnil());
-     $F.content_write_byte(w, byte), $F.content_write(w, borrow, len): the
-       answer is a datavtype, either the writer at the cells with the byte
-       or run appended (APPEND proved) or a failed write (no proof);
-     $F.content_close(w): either $F.FILE_HOLDS(written), the proof that the
-       file holds exactly those cells, or a failed close (no proof).
-   inflate_stored_proved takes the streams of stored blocks, inflate_proved
-   every Deflate stream. The compressed bytes are a barr of n bytes. The
-   output is as long as the archive check allows, at most 2147483647 bytes:
-   its cells have a count size, a natural number that fits an int. *)
+(* The decoders read the compressed bytes from a reader and stream the
+   output to a writer, keeping a small buffer, the bit reservoir and the
+   window. They are written against the file package's reader and writer
+   of bats-lang/file#76, whose names this declares against (the zip pull
+   request relocks to the published file package):
+     $F.content_reader(consumed), $F.content_writer(written): linear,
+       indexed by the cells consumed or written so far, created at cnil();
+     reading a chunk into a borrowed buffer answers the reader at consumed
+       with the chunk appended (APPEND), or the end of the file, which
+       closes the index with $F.FILE_READ(consumed), or a failed read;
+     writing a byte or run answers the writer with the cells appended, or
+       a failed write; $F.content_close answers $F.FILE_HOLDS(written) or
+       a failed close.
+   The compressed cells of the proof are the cells the end of file closes
+   the reader's index at. inflate_stored_proved takes the streams of
+   stored blocks, inflate_proved every Deflate stream. The input is
+   size_in bytes (the entry's data, a range of the archive: file#76 as
+   asked has no reader of a range, see the hand-back) and the output is at
+   most 2147483647 bytes, the archive check's bound: its cells have a count
+   that is a natural number fitting an int. *)
 #pub stadef INFLATE_OUTPUT_MOST = 2147483647
 
-#pub datavtype inflated(compressed:$A.cells) =
-  (* the whole stream was decoded: the output cells are what the file
-     holds, and its count is size *)
-  | {output:$A.cells}{size:nat | size <= INFLATE_OUTPUT_MOST}
-    inflated_done(compressed) of (INFLATES(inflate_deflated(), compressed, output), $A.CLEN(output, size), $F.FILE_HOLDS(output) | int size)
+#pub datavtype inflated =
+  (* the whole stream was decoded: the output cells are what the file holds *)
+  | {compressed,output:$A.cells}{compressed_size,size:nat | size <= INFLATE_OUTPUT_MOST}
+    inflated_done of (INFLATES(inflate_deflated(), compressed, output), $A.CLEN(compressed, compressed_size), $A.CLEN(output, size),
+                      $F.FILE_READ(compressed), $F.FILE_HOLDS(output) | int size)
   (* the stream is not one the decoder takes; the file was closed and holds
      what was written before that, the cells partial *)
-  | {partial:$A.cells} inflated_malformed(compressed) of ($F.FILE_HOLDS(partial) | )
-  (* the stream was decoded but the file did not close: the file's content
-     is not proved, the INFLATES is *)
-  | {output:$A.cells} inflated_close_failed(compressed) of (INFLATES(inflate_deflated(), compressed, output) | $F.io_error)
+  | {partial:$A.cells} inflated_malformed of ($F.FILE_HOLDS(partial) | )
+  (* the stream was decoded but the file did not close: the INFLATES is proved *)
+  | {compressed,output:$A.cells} inflated_close_failed of (INFLATES(inflate_deflated(), compressed, output), $F.FILE_READ(compressed) | $F.io_error)
+  (* a read failed *)
+  | inflated_read_failed of ($F.io_error)
   (* a write failed: nothing is proved of the file *)
-  | inflated_write_failed(compressed) of ($F.io_error)
+  | inflated_write_failed of ($F.io_error)
   (* the stream was malformed and the file did not close *)
-  | inflated_malformed_close_failed(compressed) of ($F.io_error)
+  | inflated_malformed_close_failed of ($F.io_error)
 
-#pub fun inflate_stored_proved {l:agz}{n:nat}{compressed:$A.cells}
-  (source: !$A.barr(l, n, compressed), n: int n, writer: $F.content_writer($A.cnil()))
-  : inflated(compressed)
+#pub fun inflate_stored_proved
+  (reader: $F.content_reader($A.cnil()), writer: $F.content_writer($A.cnil()), size_in: int): inflated
 
-#pub fun inflate_proved {l:agz}{n:nat}{compressed:$A.cells}
-  (source: !$A.barr(l, n, compressed), n: int n, writer: $F.content_writer($A.cnil()))
-  : inflated(compressed)
+#pub fun inflate_proved
+  (reader: $F.content_reader($A.cnil()), writer: $F.content_writer($A.cnil()), size_in: int): inflated
