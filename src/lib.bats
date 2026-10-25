@@ -808,7 +808,8 @@ primplement inflates_functional {kind}{compressed,first,second} (first_proof, se
    The window: what a back-reference is read from (zip#64)
    ============================================================ *)
 
-(* The decoder keeps a window, not the output: a back-reference reaches at
+(* Window storage (streaming window keyword): one barr of 65536 bytes, the last 32768 bytes of output plus the half being filled, well inside barr_alloc's bound; no arena.
+   The decoder keeps a window, not the output: a back-reference reaches at
    most 32768 bytes back (3.2.5). TAKE_LAST(output, keep, window): window is
    the last min(keep, count) cells of output *)
 #pub dataprop TAKE_LAST($A.cells, int, $A.cells) =
