@@ -473,10 +473,11 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
 
 (* Cells built from cells *)
 
-(* APPEND(first, second, both): both is first and then second *)
-#pub dataprop APPEND($A.cells, $A.cells, $A.cells) =
-  | {second:$A.cells} APPEND_nil($A.cnil(), second, second)
-  | {head:int}{first,second,both:$A.cells} APPEND_cons($A.ccons(head, first), second, $A.ccons(head, both)) of APPEND(first, second, both)
+(* $A.APPEND(first, second, both) is array's, not zip's (decided: the cells and
+   their relations are array's, the writer and reader of file build on array,
+   and zip takes the one APPEND all three share; array#TBD adds it with its
+   functional lemma; zip's own copy, never published, is dropped). The
+   functional lemma is array's append_functional. *)
 
 (* SLICE(source, start, width, part): the width cells from cell start are part *)
 #pub dataprop SLICE($A.cells, int, int, $A.cells) =
@@ -489,7 +490,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
   | {value:int}{rest:$A.cells} RUN_zero(0, value, rest, rest)
   | {count:nat}{value:int}{rest,all:$A.cells} RUN_cons(count + 1, value, rest, $A.ccons(value, all)) of RUN(count, value, rest, all)
 
-#pub prfun append_functional {first,second,both,other:$A.cells} (APPEND(first, second, both), APPEND(first, second, other)): CELLS_EQ(both, other)
+#pub prfun append_functional {first,second,both,other:$A.cells} ($A.APPEND(first, second, both), $A.APPEND(first, second, other)): CELLS_EQ(both, other)
 #pub prfun slice_functional {source:$A.cells}{start,width:nat}{first,second:$A.cells} (SLICE(source, start, width, first), SLICE(source, start, width, second)): CELLS_EQ(first, second)
 
 (* The canonical Huffman code, RFC 1951 3.2.2: lengths is the code length of
@@ -586,17 +587,20 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
   | SYMBOL_CLASS_end_of_block(symbol_end_of_block(), 256)
   | {sym:int | 257 <= sym; sym <= 285} SYMBOL_CLASS_length(symbol_length(), sym)
 
-(* LENGTH_SYMBOL(sym, extra_bits, base): length symbol sym (257 to 285) has
+(* Symbol 284 with 31 extra bits would be the length 258, which RFC 1951 3.2.5
+   gives to symbol 285 alone (zlib accepts it; SYMS_copy refuses it: only what
+   the RFC allows has a constructor).
+   LENGTH_SYMBOL(sym, extra_bits, base): length symbol sym (257 to 285) has
    extra_bits extra bits and its match lengths start at base (the table of
    3.2.5): symbols 257 to 264 have none; then four symbols for each extra
    bit count 1 to 5, whose bases are 4, 5, 6 and 7 times 2 to the extra
    bit count, plus 3; symbol 285 is the length 258 alone *)
 #pub dataprop LENGTH_SYMBOL(int, int, int) =
   | {sym:int | 257 <= sym; sym <= 264} LENGTH_SYMBOL_short(sym, 0, sym - 254)
-  | {extra_bits,power:nat | 1 <= extra_bits; extra_bits <= 5} LENGTH_SYMBOL_group_0(261 + 4 * extra_bits, extra_bits, 4 * power + 3) of $AR.POW2(extra_bits, power)
-  | {extra_bits,power:nat | 1 <= extra_bits; extra_bits <= 5} LENGTH_SYMBOL_group_1(262 + 4 * extra_bits, extra_bits, 5 * power + 3) of $AR.POW2(extra_bits, power)
-  | {extra_bits,power:nat | 1 <= extra_bits; extra_bits <= 5} LENGTH_SYMBOL_group_2(263 + 4 * extra_bits, extra_bits, 6 * power + 3) of $AR.POW2(extra_bits, power)
-  | {extra_bits,power:nat | 1 <= extra_bits; extra_bits <= 5} LENGTH_SYMBOL_group_3(264 + 4 * extra_bits, extra_bits, 7 * power + 3) of $AR.POW2(extra_bits, power)
+  | {extra_bits,power:nat | 1 <= extra_bits; extra_bits <= 5} LENGTH_SYMBOL_base_4_times(261 + 4 * extra_bits, extra_bits, 4 * power + 3) of $AR.POW2(extra_bits, power)
+  | {extra_bits,power:nat | 1 <= extra_bits; extra_bits <= 5} LENGTH_SYMBOL_base_5_times(262 + 4 * extra_bits, extra_bits, 5 * power + 3) of $AR.POW2(extra_bits, power)
+  | {extra_bits,power:nat | 1 <= extra_bits; extra_bits <= 5} LENGTH_SYMBOL_base_6_times(263 + 4 * extra_bits, extra_bits, 6 * power + 3) of $AR.POW2(extra_bits, power)
+  | {extra_bits,power:nat | 1 <= extra_bits; extra_bits <= 5} LENGTH_SYMBOL_base_7_times(264 + 4 * extra_bits, extra_bits, 7 * power + 3) of $AR.POW2(extra_bits, power)
   | LENGTH_SYMBOL_last(285, 0, 258)
 
 (* DISTANCE_SYMBOL(sym, extra_bits, base): distance symbol sym (0 to 29),
@@ -605,8 +609,8 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
    extra bit count, plus 1 *)
 #pub dataprop DISTANCE_SYMBOL(int, int, int) =
   | {sym:nat | sym < 4} DISTANCE_SYMBOL_short(sym, 0, sym + 1)
-  | {extra_bits,power:nat | 1 <= extra_bits; extra_bits <= 13} DISTANCE_SYMBOL_group_0(2 * extra_bits + 2, extra_bits, 2 * power + 1) of $AR.POW2(extra_bits, power)
-  | {extra_bits,power:nat | 1 <= extra_bits; extra_bits <= 13} DISTANCE_SYMBOL_group_1(2 * extra_bits + 3, extra_bits, 3 * power + 1) of $AR.POW2(extra_bits, power)
+  | {extra_bits,power:nat | 1 <= extra_bits; extra_bits <= 13} DISTANCE_SYMBOL_base_2_times(2 * extra_bits + 2, extra_bits, 2 * power + 1) of $AR.POW2(extra_bits, power)
+  | {extra_bits,power:nat | 1 <= extra_bits; extra_bits <= 13} DISTANCE_SYMBOL_base_3_times(2 * extra_bits + 3, extra_bits, 3 * power + 1) of $AR.POW2(extra_bits, power)
 
 (* FIXED_LITLEN(lengths) and FIXED_DIST(lengths): the code lengths of the
    fixed Huffman codes (3.2.6): 144 of 8 bits, 112 of 9, 24 of 7 and 8 of 8;
@@ -623,7 +627,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
 #pub dataprop COPY($A.cells, int, int, $A.cells) =
   | {output:$A.cells}{distance:int} COPY_done(output, distance, 0, output)
   | {output,next,after:$A.cells}{output_count,distance,length,copied:nat | 1 <= distance; distance <= output_count}
-    COPY_step(output, distance, length + 1, after) of ($A.CLEN(output, output_count), $A.NTH(output, output_count - distance, copied), APPEND(output, $A.ccons(copied, $A.cnil()), next), COPY(next, distance, length, after))
+    COPY_step(output, distance, length + 1, after) of ($A.CLEN(output, output_count), $A.NTH(output, output_count - distance, copied), $A.APPEND(output, $A.ccons(copied, $A.cnil()), next), COPY(next, distance, length, after))
 
 #pub prfun copy_functional {output:$A.cells}{distance,length:nat}{first,second:$A.cells} (COPY(output, distance, length, first), COPY(output, distance, length, second)): CELLS_EQ(first, second)
 
@@ -639,8 +643,8 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
   | {litlen,dist,source:$A.cells}{p,sym,used,end_bit:nat}{output,next,after:$A.cells}
     SYMS_literal(litlen, dist, source, p, output, after, end_bit)
     of (DECSYM(litlen, source, p, sym, used), SYMBOL_CLASS(symbol_literal(), sym),
-        APPEND(output, $A.ccons(sym, $A.cnil()), next), SYMS(litlen, dist, source, p + used, next, after, end_bit))
-  | {litlen,dist,source:$A.cells}{p,sym,used,length_extra_bits,length_base,length_extra_value,dist_sym,dist_used,dist_extra_bits,dist_base,dist_extra_value,end_bit:nat}{output,next,after:$A.cells}
+        $A.APPEND(output, $A.ccons(sym, $A.cnil()), next), SYMS(litlen, dist, source, p + used, next, after, end_bit))
+  | {litlen,dist,source:$A.cells}{p,sym,used,length_extra_bits,length_base,length_extra_value,dist_sym,dist_used,dist_extra_bits,dist_base,dist_extra_value,end_bit:nat | sym == 285 || length_base + length_extra_value <= 257}{output,next,after:$A.cells}
     SYMS_copy(litlen, dist, source, p, output, after, end_bit)
     of (DECSYM(litlen, source, p, sym, used), SYMBOL_CLASS(symbol_length(), sym),
         LENGTH_SYMBOL(sym, length_extra_bits, length_base), BITS(source, p + used, length_extra_bits, length_extra_value),
@@ -707,22 +711,22 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
   | {code_length_code,source:$A.cells}{p,total,so_far_count,sym,used,end_bit:nat | so_far_count < total}{so_far,next,lengths:$A.cells}
     CODE_LENGTHS_literal(code_length_code, source, p, so_far, total, lengths, end_bit)
     of ($A.CLEN(so_far, so_far_count), DECSYM(code_length_code, source, p, sym, used), LENGTH_CLASS(length_literal(), sym),
-        APPEND(so_far, $A.ccons(sym, $A.cnil()), next), CODE_LENGTHS(code_length_code, source, p + used, next, total, lengths, end_bit))
+        $A.APPEND(so_far, $A.ccons(sym, $A.cnil()), next), CODE_LENGTHS(code_length_code, source, p + used, next, total, lengths, end_bit))
   | {code_length_code,source:$A.cells}{p,total,so_far_count,sym,used,extra_value,end_bit,previous:nat | 1 <= so_far_count; so_far_count + 3 + extra_value <= total}{so_far,run,next,lengths:$A.cells}
     CODE_LENGTHS_repeat_previous(code_length_code, source, p, so_far, total, lengths, end_bit)
     of ($A.CLEN(so_far, so_far_count), DECSYM(code_length_code, source, p, sym, used), LENGTH_CLASS(length_repeat_previous(), sym),
         BITS(source, p + used, 2, extra_value), $A.NTH(so_far, so_far_count - 1, previous),
-        RUN(3 + extra_value, previous, $A.cnil(), run), APPEND(so_far, run, next), CODE_LENGTHS(code_length_code, source, p + used + 2, next, total, lengths, end_bit))
+        RUN(3 + extra_value, previous, $A.cnil(), run), $A.APPEND(so_far, run, next), CODE_LENGTHS(code_length_code, source, p + used + 2, next, total, lengths, end_bit))
   | {code_length_code,source:$A.cells}{p,total,so_far_count,sym,used,extra_value,end_bit:nat | so_far_count + 3 + extra_value <= total}{so_far,run,next,lengths:$A.cells}
     CODE_LENGTHS_zeros_short(code_length_code, source, p, so_far, total, lengths, end_bit)
     of ($A.CLEN(so_far, so_far_count), DECSYM(code_length_code, source, p, sym, used), LENGTH_CLASS(length_zeros_short(), sym),
         BITS(source, p + used, 3, extra_value),
-        RUN(3 + extra_value, 0, $A.cnil(), run), APPEND(so_far, run, next), CODE_LENGTHS(code_length_code, source, p + used + 3, next, total, lengths, end_bit))
+        RUN(3 + extra_value, 0, $A.cnil(), run), $A.APPEND(so_far, run, next), CODE_LENGTHS(code_length_code, source, p + used + 3, next, total, lengths, end_bit))
   | {code_length_code,source:$A.cells}{p,total,so_far_count,sym,used,extra_value,end_bit:nat | so_far_count + 11 + extra_value <= total}{so_far,run,next,lengths:$A.cells}
     CODE_LENGTHS_zeros_long(code_length_code, source, p, so_far, total, lengths, end_bit)
     of ($A.CLEN(so_far, so_far_count), DECSYM(code_length_code, source, p, sym, used), LENGTH_CLASS(length_zeros_long(), sym),
         BITS(source, p + used, 7, extra_value),
-        RUN(11 + extra_value, 0, $A.cnil(), run), APPEND(so_far, run, next), CODE_LENGTHS(code_length_code, source, p + used + 7, next, total, lengths, end_bit))
+        RUN(11 + extra_value, 0, $A.cnil(), run), $A.APPEND(so_far, run, next), CODE_LENGTHS(code_length_code, source, p + used + 7, next, total, lengths, end_bit))
 
 #pub prfun code_lengths_functional {code_length_code,source:$A.cells}{p,total:nat}{so_far,first,second:$A.cells}{first_end,second_end:nat}
   (LENGTHS_FIT(code_length_code, 7), CODE_LENGTHS(code_length_code, source, p, so_far, total, first, first_end), CODE_LENGTHS(code_length_code, source, p, so_far, total, second, second_end)): [first_end == second_end] CELLS_EQ(first, second)
@@ -748,7 +752,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
   (* skips to the byte boundary, LEN, NLEN = the complement of LEN, then LEN bytes *)
   | {source:$A.cells}{p,data_byte,len,nlen:nat | 8 * data_byte >= p; 8 * data_byte < p + 8; len + nlen == 65535}{before,data,after:$A.cells}
     BLOCK_stored(block_stored(), source, p, before, after, 8 * (data_byte + 4 + len))
-    of (BITS(source, 8 * data_byte, 16, len), BITS(source, 8 * data_byte + 16, 16, nlen), SLICE(source, data_byte + 4, len, data), APPEND(before, data, after))
+    of (BITS(source, 8 * data_byte, 16, len), BITS(source, 8 * data_byte + 16, 16, nlen), SLICE(source, data_byte + 4, len, data), $A.APPEND(before, data, after))
   | {source,litlen,dist:$A.cells}{p,end_bit:nat}{before,after:$A.cells}
     BLOCK_fixed(block_fixed(), source, p, before, after, end_bit)
     of (FIXED_LITLEN(litlen), FIXED_DIST(dist), LENGTHS_FIT(litlen, 15), LENGTHS_FIT(dist, 15), SYMS(litlen, dist, source, p, before, after, end_bit))
@@ -758,7 +762,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
         READ_LENGTHS3(source, p + 14, hclen + 4, values), CL_ORDER(order), CODE_LENGTHS_FROM(order, hclen + 4, values, 0, code_length_code),
         LENGTHS_FIT(code_length_code, 7), LENGTHS_FULL(code_length_code, 7),
         CODE_LENGTHS(code_length_code, source, p + 14 + 3 * (hclen + 4), $A.cnil(), hlit + 257 + hdist + 1, all_lengths, data_start),
-        $A.CLEN(litlen, hlit + 257), APPEND(litlen, dist, all_lengths), LITLEN_USABLE(litlen), DIST_USABLE(dist),
+        $A.CLEN(litlen, hlit + 257), $A.APPEND(litlen, dist, all_lengths), LITLEN_USABLE(litlen), DIST_USABLE(dist),
         SYMS(litlen, dist, source, data_start, before, after, end_bit))
 
 #pub prfun block_functional {kind:block_kind}{source:$A.cells}{p:nat}{before,first,second:$A.cells}{first_end,second_end:nat}
@@ -828,19 +832,32 @@ primplement inflates_functional {kind}{compressed,first,second} (first_proof, se
    window and the data, and it is the window of the output after *)
 #pub dataprop WINDOW_AFTER_APPEND($A.cells, $A.cells, $A.cells) =
   | {window,data,next,both,next_window:$A.cells}
-    WINDOW_AFTER_APPEND_mk(window, data, next) of (APPEND(window, data, both), TAKE_LAST(both, 32768, next_window), WINDOW(next, next_window))
+    WINDOW_AFTER_APPEND_mk(window, data, next) of ($A.APPEND(window, data, both), TAKE_LAST(both, 32768, next_window), WINDOW(next, next_window))
 
 #pub prfun window_append {output,window,data,next:$A.cells}
-  (WINDOW(output, window), APPEND(output, data, next)): WINDOW_AFTER_APPEND(window, data, next)
+  (WINDOW(output, window), $A.APPEND(output, data, next)): WINDOW_AFTER_APPEND(window, data, next)
 
-(* A copy read from the window is the copy read from the output: the same
-   bytes are appended, and the window after is the window of the output after *)
+(* A copy read from the window is the copy read from the output: the window
+   followed by the copied cells, cut to its last 32768, is the window of the
+   output after the copy *)
 #pub dataprop WINDOW_AFTER_COPY($A.cells, int, int, $A.cells) =
-  | {window,after,next_window:$A.cells}{distance,length:nat}
-    WINDOW_AFTER_COPY_mk(window, distance, length, after) of (COPY(window, distance, length, next_window), WINDOW(after, next_window))
+  | {window,after,both,next_window:$A.cells}{distance,length:nat}
+    WINDOW_AFTER_COPY_mk(window, distance, length, after) of (COPY(window, distance, length, both), TAKE_LAST(both, 32768, next_window), WINDOW(after, next_window))
 
 #pub prfun window_copy {output,window,after:$A.cells}{distance,length:nat | distance <= 32768}
   (WINDOW(output, window), COPY(output, distance, length, after)): WINDOW_AFTER_COPY(window, distance, length, after)
+
+(* The window lives in the decoder's 65536-byte barr: the last cells
+   written are the window, starting at cell start of the barr's cells *)
+#pub dataprop WINDOW_IN_BUFFER($A.cells, int, $A.cells) =
+  | {buffer,window:$A.cells}{start,count:nat} WINDOW_IN_BUFFER_mk(buffer, start, window) of (SLICE(buffer, start, count, window), $A.CLEN(window, count))
+
+(* Ranges (the Done-when): a copy's distance is 1 to 32768 and its length
+   3 to 258 *)
+#pub prfun distance_range {sym,extra_bits,base,value:nat}{source:$A.cells}{p:nat}
+  (DISTANCE_SYMBOL(sym, extra_bits, base), BITS(source, p, extra_bits, value)): [1 <= base + value; base + value <= 32768] void
+#pub prfun length_range {sym,extra_bits,base,value:nat}{source:$A.cells}{p:nat}
+  (LENGTH_SYMBOL(sym, extra_bits, base), BITS(source, p, extra_bits, value)): [3 <= base + value; base + value <= 258] void
 
 (* ============================================================
    The input in chunks: how a buffer relates to the consumed prefix (zip#64)
@@ -851,15 +868,15 @@ primplement inflates_functional {kind}{compressed,first,second} (first_proof, se
    file it closes, as the whole compressed sequence the proof talks about.
    Bits read from a prefix are bits of the whole sequence: *)
 #pub prfun bits_in_prefix {prefix,rest,whole:$A.cells}{p,width,value:nat}
-  (APPEND(prefix, rest, whole), BITS(prefix, p, width, value)): BITS(whole, p, width, value)
+  ($A.APPEND(prefix, rest, whole), BITS(prefix, p, width, value)): BITS(whole, p, width, value)
 #pub prfun hbits_in_prefix {prefix,rest,whole:$A.cells}{p,width,code:nat}
-  (APPEND(prefix, rest, whole), HBITS(prefix, p, width, code)): HBITS(whole, p, width, code)
+  ($A.APPEND(prefix, rest, whole), HBITS(prefix, p, width, code)): HBITS(whole, p, width, code)
 
 (* BUFFER_AT(previous, chunk, consumed, start): the chunk in the decoder's
    buffer was the last read, consumed is the cells before it and the chunk,
    and the buffer's cell i is cell start + i of the consumed cells *)
 #pub dataprop BUFFER_AT($A.cells, $A.cells, $A.cells, int) =
-  | {previous,chunk,consumed:$A.cells}{start:nat} BUFFER_AT_mk(previous, chunk, consumed, start) of ($A.CLEN(previous, start), APPEND(previous, chunk, consumed))
+  | {previous,chunk,consumed:$A.cells}{start:nat} BUFFER_AT_mk(previous, chunk, consumed, start) of ($A.CLEN(previous, start), $A.APPEND(previous, chunk, consumed))
 
 #pub prfun buffer_nth {previous,chunk,consumed:$A.cells}{start,index,value:nat}
   (BUFFER_AT(previous, chunk, consumed, start), $A.NTH(chunk, index, value)): $A.NTH(consumed, start + index, value)
@@ -876,44 +893,61 @@ primplement inflates_functional {kind}{compressed,first,second} (first_proof, se
 (* The decoders read the compressed bytes from a reader and stream the
    output to a writer, keeping a small buffer, the bit reservoir and the
    window. They are written against the file package's reader and writer
-   of bats-lang/file#76, whose names this declares against (the zip pull
-   request relocks to the published file package):
-     $F.content_reader(consumed), $F.content_writer(written): linear,
-       indexed by the cells consumed or written so far, created at cnil();
+   of bats-lang/file#76 (items 5 to 7), whose names this declares against
+   (the zip pull request relocks to the published file package):
+     $F.content_reader(consumed, start, limit): linear, opened at byte
+       start of the file with a byte limit (item 6), indexed by the cells
+       consumed so far, created at cnil();
+     $F.content_writer(written): linear, created at cnil();
      reading a chunk into a borrowed buffer answers the reader at consumed
-       with the chunk appended (APPEND), or the end of the file, which
-       closes the index with $F.FILE_READ(consumed), or a failed read;
+       with the chunk appended ($A.APPEND), or the end of the file (the
+       limit), which closes the index with $F.FILE_READ(consumed, start,
+       limit): the consumed cells are the file's bytes [start, start +
+       limit), or a failed read;
      writing a byte or run answers the writer with the cells appended, or
        a failed write; $F.content_close answers $F.FILE_HOLDS(written) or
        a failed close.
-   The compressed cells of the proof are the cells the end of file closes
-   the reader's index at. inflate_stored_proved takes the streams of
-   stored blocks, inflate_proved every Deflate stream. The input is
-   size_in bytes (the entry's data, a range of the archive: file#76 as
-   asked has no reader of a range, see the hand-back) and the output is at
-   most 2147483647 bytes, the archive check's bound: its cells have a count
-   that is a natural number fitting an int. *)
+   A call that fails consumes its handle (no proof of it); the decoder
+   consumes both handles and says the fate of each in its answer.
+   inflate_stored_proved takes the streams of stored blocks, inflate_proved
+   every Deflate stream. The input is the entry's data, size_in bytes from
+   byte start, and the output is at most 2147483647 bytes, the archive
+   check's bound: its cells have a count that is a natural number fitting
+   an int. *)
 #pub stadef INFLATE_OUTPUT_MOST = 2147483647
 
+(* What became of the reader when the decoder stopped *)
+#pub datavtype reader_fate =
+  | {compressed:$A.cells}{start,size_in:nat} reader_ended(compressed) of ($F.FILE_READ(compressed, start, size_in) | )
+  | reader_closed_early of ()
+  | reader_lost of ($F.io_error)
+
+(* What became of the writer when the decoder stopped *)
+#pub datavtype writer_fate =
+  | {written:$A.cells} writer_held(written) of ($F.FILE_HOLDS(written) | )
+  | writer_lost of ($F.io_error)
+
+#pub datatype inflate_failure =
+  | failure_malformed
+  | failure_read
+  | failure_write
+
 #pub datavtype inflated =
-  (* the whole stream was decoded: the output cells are what the file holds *)
-  | {compressed,output:$A.cells}{compressed_size,size:nat | size <= INFLATE_OUTPUT_MOST}
-    inflated_done of (INFLATES(inflate_deflated(), compressed, output), $A.CLEN(compressed, compressed_size), $A.CLEN(output, size),
-                      $F.FILE_READ(compressed), $F.FILE_HOLDS(output) | int size)
-  (* the stream is not one the decoder takes; the file was closed and holds
-     what was written before that, the cells partial *)
-  | {partial:$A.cells} inflated_malformed of ($F.FILE_HOLDS(partial) | )
-  (* the stream was decoded but the file did not close: the INFLATES is proved *)
-  | {compressed,output:$A.cells} inflated_close_failed of (INFLATES(inflate_deflated(), compressed, output), $F.FILE_READ(compressed) | $F.io_error)
-  (* a read failed *)
-  | inflated_read_failed of ($F.io_error)
-  (* a write failed: nothing is proved of the file *)
-  | inflated_write_failed of ($F.io_error)
-  (* the stream was malformed and the file did not close *)
-  | inflated_malformed_close_failed of ($F.io_error)
+  (* the whole stream was decoded, the input read to its end and the output
+     is what the file holds *)
+  | {compressed,output:$A.cells}{start,size_in,size:nat | size <= INFLATE_OUTPUT_MOST}
+    inflated_done of (INFLATES(inflate_deflated(), compressed, output), $A.CLEN(compressed, size_in), $A.CLEN(output, size),
+                      $F.FILE_READ(compressed, start, size_in), $F.FILE_HOLDS(output) | int size)
+  (* the whole stream was decoded and read, but the file did not close or a
+     write at the end failed: the INFLATES is proved, the file is not *)
+  | {compressed,output:$A.cells}{start,size_in:nat}
+    inflated_decoded_unsaved of (INFLATES(inflate_deflated(), compressed, output), $F.FILE_READ(compressed, start, size_in) | $F.io_error)
+  (* the decoder stopped: why (malformed stream, failed read, failed write),
+     and what became of each handle *)
+  | inflated_stopped of (inflate_failure, reader_fate, writer_fate)
 
-#pub fun inflate_stored_proved
-  (reader: $F.content_reader($A.cnil()), writer: $F.content_writer($A.cnil()), size_in: int): inflated
+#pub fun inflate_stored_proved {start,size_in:nat}
+  (reader: $F.content_reader($A.cnil(), start, size_in), writer: $F.content_writer($A.cnil()), start: int start, size_in: int size_in): inflated
 
-#pub fun inflate_proved
-  (reader: $F.content_reader($A.cnil()), writer: $F.content_writer($A.cnil()), size_in: int): inflated
+#pub fun inflate_proved {start,size_in:nat}
+  (reader: $F.content_reader($A.cnil(), start, size_in), writer: $F.content_writer($A.cnil()), start: int start, size_in: int size_in): inflated
