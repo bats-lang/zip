@@ -431,7 +431,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
    RFC 1951 as relations (quire#608, zip#64): the declarations
    ============================================================ *)
 
-(* Deprecated, CELLS_EQ keyword (array#82 owns the relation as $A.CELLS_EQ; zip's published form stays beside it for one version, the p2 removal ticket is filed with this change): cells and cells are the same cells: the one constructor is the only way
+(* Deprecated, CELLS_EQ keyword (array#82 owns the relation as $A.CELLS_EQ; zip's published form stays beside it for one version, removed by zip#74): cells and cells are the same cells: the one constructor is the only way
    to have it, so a lemma's conclusion that two outputs are the same is
    this *)
 #pub dataprop CELLS_EQ($A.cells, $A.cells) =
