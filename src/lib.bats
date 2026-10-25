@@ -5,6 +5,7 @@
 #include "share/atspre_staload.hats"
 
 #use array as A
+#use file as F
 #use arith as AR
 #use result as R
 
@@ -803,33 +804,84 @@ primplement inflates_functional {kind}{compressed,first,second} (first_proof, se
   case+ first_proof of
   | INFLATES_stored() => (case+ second_proof of INFLATES_stored() => CELLS_EQ_refl())
 
-(* The decoders that return the proof (zip#64): functions over array's
-   barr that give the output cells with INFLATES, or refuse a stream they
-   cannot take. inflate_stored_proved takes the streams of stored blocks,
-   inflate_proved every Deflate stream.
+(* ============================================================
+   The window: what a back-reference is read from (zip#64)
+   ============================================================ *)
 
-   The output goes to a destination the caller made: an empty output (a
-   deflate stream of an empty file; an array has at least one cell) is the
-   destination_empty constructor, and any other size is a piece of an arena
-   (array's arena_alloc, pieces up to ARENA_MOST, the largest class, so an
-   output over 1 MiB is a piece too). The answer gives the piece back, as a
-   barr with the proof of its cells and array's arrx_lent view, for
-   barr_to_arrx and arena_return; a refusal gives the piece back untouched. *)
-#pub datavtype destination(size:int, owner:addr) =
-  | destination_empty(0, owner) of ()
-  | {lo:agz}{size:pos} destination_piece(size, owner) of $A.arrx(byte, lo, size, owner)
+(* The decoder keeps a window, not the output: a back-reference reaches at
+   most 32768 bytes back (3.2.5). TAKE_LAST(output, keep, window): window is
+   the last min(keep, count) cells of output *)
+#pub dataprop TAKE_LAST($A.cells, int, $A.cells) =
+  | {output:$A.cells}{count,keep:nat | count <= keep} TAKE_LAST_short(output, keep, output) of $A.CLEN(output, count)
+  | {rest,window:$A.cells}{head:int}{count,keep:nat | keep <= count} TAKE_LAST_drop($A.ccons(head, rest), keep, window)
+    of ($A.CLEN(rest, count), TAKE_LAST(rest, keep, window))
 
-#pub datavtype inflated(compressed:$A.cells, size:int, owner:addr) =
-  | inflated_empty(compressed, 0, owner) of (INFLATES(inflate_deflated(), compressed, $A.cnil()) | )
-  | {lo:agz}{size:pos}{output:$A.cells}
-    inflated_piece(compressed, size, owner) of (INFLATES(inflate_deflated(), compressed, output), $A.CLEN(output, size), $A.arrx_lent(lo, size, owner) | $A.barr(lo, size, output))
-  | {lo:agz}{size:pos} inflated_refused_piece(compressed, size, owner) of $A.arrx(byte, lo, size, owner)
-  | inflated_refused_empty(compressed, 0, owner) of ()
+(* WINDOW(output, window): the window holds the last min(32768, written)
+   bytes of the output so far *)
+#pub dataprop WINDOW($A.cells, $A.cells) =
+  | {output,window:$A.cells} WINDOW_mk(output, window) of TAKE_LAST(output, 32768, window)
 
-#pub fun inflate_stored_proved {l:agz}{n:nat}{compressed:$A.cells}{size:nat | size <= $A.ARENA_MOST}{owner:addr}
-  (source: !$A.barr(l, n, compressed), n: int n, size: int size, dest: destination(size, owner))
-  : inflated(compressed, size, owner)
+#pub prfun window_functional {output,first,second:$A.cells} (WINDOW(output, first), WINDOW(output, second)): CELLS_EQ(first, second)
 
-#pub fun inflate_proved {l:agz}{n:nat}{compressed:$A.cells}{size:nat | size <= $A.ARENA_MOST}{owner:addr}
-  (source: !$A.barr(l, n, compressed), n: int n, size: int size, dest: destination(size, owner))
-  : inflated(compressed, size, owner)
+(* The window after appending data to the output: the last 32768 of the
+   window and the data, and it is the window of the output after *)
+#pub dataprop WINDOW_AFTER_APPEND($A.cells, $A.cells, $A.cells) =
+  | {window,data,next,both,next_window:$A.cells}
+    WINDOW_AFTER_APPEND_mk(window, data, next) of (APPEND(window, data, both), TAKE_LAST(both, 32768, next_window), WINDOW(next, next_window))
+
+#pub prfun window_append {output,window,data,next:$A.cells}
+  (WINDOW(output, window), APPEND(output, data, next)): WINDOW_AFTER_APPEND(window, data, next)
+
+(* A copy read from the window is the copy read from the output: the same
+   bytes are appended, and the window after is the window of the output after *)
+#pub dataprop WINDOW_AFTER_COPY($A.cells, int, int, $A.cells) =
+  | {window,after,next_window:$A.cells}{distance,length:nat}
+    WINDOW_AFTER_COPY_mk(window, distance, length, after) of (COPY(window, distance, length, next_window), WINDOW(after, next_window))
+
+#pub prfun window_copy {output,window,after:$A.cells}{distance,length:nat | distance <= 32768}
+  (WINDOW(output, window), COPY(output, distance, length, after)): WINDOW_AFTER_COPY(window, distance, length, after)
+
+(* ============================================================
+   The decoders that return the proof (zip#64)
+   ============================================================ *)
+
+(* The decoders stream the output to a file writer and keep only the
+   window. They are written against the writer bats-lang/file#76 asks for,
+   whose names this declares against (the zip pull request relocks to the
+   published file package):
+     $F.content_writer(written): linear, the cells written so far;
+     $F.content_writer_create(fd): content_writer(cnil());
+     $F.content_write_byte(w, byte), $F.content_write(w, borrow, len): the
+       answer is a datavtype, either the writer at the cells with the byte
+       or run appended (APPEND proved) or a failed write (no proof);
+     $F.content_close(w): either $F.FILE_HOLDS(written), the proof that the
+       file holds exactly those cells, or a failed close (no proof).
+   inflate_stored_proved takes the streams of stored blocks, inflate_proved
+   every Deflate stream. The compressed bytes are a barr of n bytes. The
+   output is as long as the archive check allows, at most 2147483647 bytes:
+   its cells have a count size, a natural number that fits an int. *)
+#pub stadef INFLATE_OUTPUT_MOST = 2147483647
+
+#pub datavtype inflated(compressed:$A.cells) =
+  (* the whole stream was decoded: the output cells are what the file
+     holds, and its count is size *)
+  | {output:$A.cells}{size:nat | size <= INFLATE_OUTPUT_MOST}
+    inflated_done(compressed) of (INFLATES(inflate_deflated(), compressed, output), $A.CLEN(output, size), $F.FILE_HOLDS(output) | int size)
+  (* the stream is not one the decoder takes; the file was closed and holds
+     what was written before that, the cells partial *)
+  | {partial:$A.cells} inflated_malformed(compressed) of ($F.FILE_HOLDS(partial) | )
+  (* the stream was decoded but the file did not close: the file's content
+     is not proved, the INFLATES is *)
+  | {output:$A.cells} inflated_close_failed(compressed) of (INFLATES(inflate_deflated(), compressed, output) | $F.io_error)
+  (* a write failed: nothing is proved of the file *)
+  | inflated_write_failed(compressed) of ($F.io_error)
+  (* the stream was malformed and the file did not close *)
+  | inflated_malformed_close_failed(compressed) of ($F.io_error)
+
+#pub fun inflate_stored_proved {l:agz}{n:nat}{compressed:$A.cells}
+  (source: !$A.barr(l, n, compressed), n: int n, writer: $F.content_writer($A.cnil()))
+  : inflated(compressed)
+
+#pub fun inflate_proved {l:agz}{n:nat}{compressed:$A.cells}
+  (source: !$A.barr(l, n, compressed), n: int n, writer: $F.content_writer($A.cnil()))
+  : inflated(compressed)
