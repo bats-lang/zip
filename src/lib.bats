@@ -5,7 +5,6 @@
 #include "share/atspre_staload.hats"
 
 #use array as A
-#use file as F
 #use arith as AR
 #use result as R
 
@@ -428,14 +427,13 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
   if nl <> nb then false else _name_eq(cd, no, name, nb)
 
 (* ============================================================
-   RFC 1951 as relations (quire#608, zip#64): the declarations
+   RFC 1951 as relations (quire#608, zip#64): bits, the canonical Huffman code, the alphabets
    ============================================================ *)
 
-(* Deprecated, CELLS_EQ keyword (array#82 owns the relation as $A.CELLS_EQ; zip's published form stays beside it for one version, removed by zip#74): cells and cells are the same cells: the one constructor is the only way
-   to have it, so a lemma's conclusion that two outputs are the same is
-   this *)
-#pub dataprop CELLS_EQ($A.cells, $A.cells) =
-  | {cells:$A.cells} CELLS_EQ_refl(cells, cells)
+(* The rest of the relations (copies, symbols, the code length run, blocks, the window's
+   lemmas, the decoders) need array#82 (APPEND, CELLS_EQ) and file#76 (the reader and the
+   writer): their approved declarations are in design/rfc1951-declarations.txt, added to
+   this file when those are published (zip#64). *)
 
 (* Bit reading, RFC 1951 3.1.1. Bits are numbered from 0, the least
    significant bit of cell 0 first: bit p is bit (p mod 8) of cell (p div 8). *)
@@ -473,12 +471,6 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
 
 (* Cells built from cells *)
 
-(* $A.APPEND(first, second, both) is array's, not zip's (decided: the cells and
-   their relations are array's, the writer and reader of file build on array,
-   and zip takes the one APPEND all three share; array#82 adds it with its
-   functional lemma; zip's own copy, never published, is dropped). The
-   functional lemma is array's append_functional. *)
-
 (* SLICE(source, start, width, part): the width cells from cell start are part *)
 #pub dataprop SLICE($A.cells, int, int, $A.cells) =
   | {source:$A.cells}{start:nat} SLICE_nil(source, start, 0, $A.cnil())
@@ -489,8 +481,6 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
 #pub dataprop RUN(int, int, $A.cells, $A.cells) =
   | {value:int}{rest:$A.cells} RUN_zero(0, value, rest, rest)
   | {count:nat}{value:int}{rest,all:$A.cells} RUN_cons(count + 1, value, rest, $A.ccons(value, all)) of RUN(count, value, rest, all)
-
-#pub prfun slice_functional {source:$A.cells}{start,width:nat}{first,second:$A.cells} (SLICE(source, start, width, first), SLICE(source, start, width, second)): $A.CELLS_EQ(first, second)
 
 (* The canonical Huffman code, RFC 1951 3.2.2: lengths is the code length of
    each symbol (cell s is the length of symbol s, 0 for none). *)
@@ -620,41 +610,6 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
 #pub dataprop FIXED_DIST($A.cells) =
   | {lengths:$A.cells} FIXED_DIST_mk(lengths) of RUN(32, 5, $A.cnil(), lengths)
 
-(* COPY(before, distance, length, after): length bytes are each copied
-   from distance back in the output so far, one after the other, so a
-   copy with distance < length reads bytes it has just written *)
-#pub dataprop COPY($A.cells, int, int, $A.cells) =
-  | {output:$A.cells}{distance:int} COPY_done(output, distance, 0, output)
-  | {output,next,after:$A.cells}{output_count,distance,length,copied:nat | 1 <= distance; distance <= output_count}
-    COPY_step(output, distance, length + 1, after) of ($A.CLEN(output, output_count), $A.NTH(output, output_count - distance, copied), $A.APPEND(output, $A.ccons(copied, $A.cnil()), next), COPY(next, distance, length, after))
-
-#pub prfun copy_functional {output:$A.cells}{distance,length:nat}{first,second:$A.cells} (COPY(output, distance, length, first), COPY(output, distance, length, second)): $A.CELLS_EQ(first, second)
-
-(* SYMS(litlen, dist, source, p, before, after, end_bit): the symbols from
-   bit p, decoded by the literal/length code litlen and the distance code
-   dist, up to the end-of-block symbol, take the output before to after,
-   and the end-of-block symbol ends at bit end_bit. A literal appends
-   itself; a length symbol, its extra bits, a distance symbol and its extra
-   bits are a copy. *)
-#pub dataprop SYMS($A.cells, $A.cells, $A.cells, int, $A.cells, $A.cells, int) =
-  | {litlen,dist,source:$A.cells}{p,sym,used:nat}{output:$A.cells}
-    SYMS_end(litlen, dist, source, p, output, output, p + used) of (DECSYM(litlen, source, p, sym, used), SYMBOL_CLASS(symbol_end_of_block(), sym))
-  | {litlen,dist,source:$A.cells}{p,sym,used,end_bit:nat}{output,next,after:$A.cells}
-    SYMS_literal(litlen, dist, source, p, output, after, end_bit)
-    of (DECSYM(litlen, source, p, sym, used), SYMBOL_CLASS(symbol_literal(), sym),
-        $A.APPEND(output, $A.ccons(sym, $A.cnil()), next), SYMS(litlen, dist, source, p + used, next, after, end_bit))
-  | {litlen,dist,source:$A.cells}{p,sym,used,length_extra_bits,length_base,length_extra_value,dist_sym,dist_used,dist_extra_bits,dist_base,dist_extra_value,end_bit:nat | sym == 285 || length_base + length_extra_value <= 257}{output,next,after:$A.cells}
-    SYMS_copy(litlen, dist, source, p, output, after, end_bit)
-    of (DECSYM(litlen, source, p, sym, used), SYMBOL_CLASS(symbol_length(), sym),
-        LENGTH_SYMBOL(sym, length_extra_bits, length_base), BITS(source, p + used, length_extra_bits, length_extra_value),
-        DECSYM(dist, source, p + used + length_extra_bits, dist_sym, dist_used), DISTANCE_SYMBOL(dist_sym, dist_extra_bits, dist_base),
-        BITS(source, p + used + length_extra_bits + dist_used, dist_extra_bits, dist_extra_value),
-        COPY(output, dist_base + dist_extra_value, length_base + length_extra_value, next),
-        SYMS(litlen, dist, source, p + used + length_extra_bits + dist_used + dist_extra_bits, next, after, end_bit))
-
-#pub prfun syms_functional {litlen,dist,source:$A.cells}{p:nat}{output,first,second:$A.cells}{first_end,second_end:nat}
-  (LENGTHS_FIT(litlen, 15), LENGTHS_FIT(dist, 15), SYMS(litlen, dist, source, p, output, first, first_end), SYMS(litlen, dist, source, p, output, second, second_end)): [first_end == second_end] $A.CELLS_EQ(first, second)
-
 (* The dynamic block's header, RFC 1951 3.2.7 *)
 
 (* CL_ORDER(order): the order in which the code length code's lengths are
@@ -700,36 +655,6 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
   | LENGTH_CLASS_zeros_short(length_zeros_short(), 17)
   | LENGTH_CLASS_zeros_long(length_zeros_long(), 18)
 
-(* CODE_LENGTHS(code_length_code, source, p, so_far, total, lengths, end_bit):
-   the code lengths so far, decoded by the code length code from bit p, go
-   on until there are total of them, lengths, ending at bit end_bit; a
-   repeat or run never goes past total, and the repeat of the previous
-   length needs one *)
-#pub dataprop CODE_LENGTHS($A.cells, $A.cells, int, $A.cells, int, $A.cells, int) =
-  | {code_length_code,source:$A.cells}{p,total:nat}{so_far:$A.cells} CODE_LENGTHS_done(code_length_code, source, p, so_far, total, so_far, p) of $A.CLEN(so_far, total)
-  | {code_length_code,source:$A.cells}{p,total,so_far_count,sym,used,end_bit:nat | so_far_count < total}{so_far,next,lengths:$A.cells}
-    CODE_LENGTHS_literal(code_length_code, source, p, so_far, total, lengths, end_bit)
-    of ($A.CLEN(so_far, so_far_count), DECSYM(code_length_code, source, p, sym, used), LENGTH_CLASS(length_literal(), sym),
-        $A.APPEND(so_far, $A.ccons(sym, $A.cnil()), next), CODE_LENGTHS(code_length_code, source, p + used, next, total, lengths, end_bit))
-  | {code_length_code,source:$A.cells}{p,total,so_far_count,sym,used,extra_value,end_bit,previous:nat | 1 <= so_far_count; so_far_count + 3 + extra_value <= total}{so_far,run,next,lengths:$A.cells}
-    CODE_LENGTHS_repeat_previous(code_length_code, source, p, so_far, total, lengths, end_bit)
-    of ($A.CLEN(so_far, so_far_count), DECSYM(code_length_code, source, p, sym, used), LENGTH_CLASS(length_repeat_previous(), sym),
-        BITS(source, p + used, 2, extra_value), $A.NTH(so_far, so_far_count - 1, previous),
-        RUN(3 + extra_value, previous, $A.cnil(), run), $A.APPEND(so_far, run, next), CODE_LENGTHS(code_length_code, source, p + used + 2, next, total, lengths, end_bit))
-  | {code_length_code,source:$A.cells}{p,total,so_far_count,sym,used,extra_value,end_bit:nat | so_far_count + 3 + extra_value <= total}{so_far,run,next,lengths:$A.cells}
-    CODE_LENGTHS_zeros_short(code_length_code, source, p, so_far, total, lengths, end_bit)
-    of ($A.CLEN(so_far, so_far_count), DECSYM(code_length_code, source, p, sym, used), LENGTH_CLASS(length_zeros_short(), sym),
-        BITS(source, p + used, 3, extra_value),
-        RUN(3 + extra_value, 0, $A.cnil(), run), $A.APPEND(so_far, run, next), CODE_LENGTHS(code_length_code, source, p + used + 3, next, total, lengths, end_bit))
-  | {code_length_code,source:$A.cells}{p,total,so_far_count,sym,used,extra_value,end_bit:nat | so_far_count + 11 + extra_value <= total}{so_far,run,next,lengths:$A.cells}
-    CODE_LENGTHS_zeros_long(code_length_code, source, p, so_far, total, lengths, end_bit)
-    of ($A.CLEN(so_far, so_far_count), DECSYM(code_length_code, source, p, sym, used), LENGTH_CLASS(length_zeros_long(), sym),
-        BITS(source, p + used, 7, extra_value),
-        RUN(11 + extra_value, 0, $A.cnil(), run), $A.APPEND(so_far, run, next), CODE_LENGTHS(code_length_code, source, p + used + 7, next, total, lengths, end_bit))
-
-#pub prfun code_lengths_functional {code_length_code,source:$A.cells}{p,total:nat}{so_far,first,second:$A.cells}{first_end,second_end:nat}
-  (LENGTHS_FIT(code_length_code, 7), CODE_LENGTHS(code_length_code, source, p, so_far, total, first, first_end), CODE_LENGTHS(code_length_code, source, p, so_far, total, second, second_end)): [first_end == second_end] $A.CELLS_EQ(first, second)
-
 (* Blocks, RFC 1951 3.2.3 *)
 
 #pub datasort block_kind =
@@ -743,73 +668,6 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
   | BTYPE_stored(block_stored(), 0)
   | BTYPE_fixed(block_fixed(), 1)
   | BTYPE_dynamic(block_dynamic(), 2)
-
-(* BLOCK(kind, source, p, before, after, end_bit): a block of the kind
-   whose body starts at bit p (after its 3 header bits) takes the output
-   before to after, and ends at bit end_bit *)
-#pub dataprop BLOCK(block_kind, $A.cells, int, $A.cells, $A.cells, int) =
-  (* skips to the byte boundary, LEN, NLEN = the complement of LEN, then LEN bytes *)
-  | {source:$A.cells}{p,data_byte,len,nlen:nat | 8 * data_byte >= p; 8 * data_byte < p + 8; len + nlen == 65535}{before,data,after:$A.cells}
-    BLOCK_stored(block_stored(), source, p, before, after, 8 * (data_byte + 4 + len))
-    of (BITS(source, 8 * data_byte, 16, len), BITS(source, 8 * data_byte + 16, 16, nlen), SLICE(source, data_byte + 4, len, data), $A.APPEND(before, data, after))
-  | {source,litlen,dist:$A.cells}{p,end_bit:nat}{before,after:$A.cells}
-    BLOCK_fixed(block_fixed(), source, p, before, after, end_bit)
-    of (FIXED_LITLEN(litlen), FIXED_DIST(dist), LENGTHS_FIT(litlen, 15), LENGTHS_FIT(dist, 15), SYMS(litlen, dist, source, p, before, after, end_bit))
-  | {source,values,order,code_length_code,all_lengths,litlen,dist:$A.cells}{p,hlit,hdist,hclen,data_start,end_bit:nat | hlit <= 29; hdist <= 29}{before,after:$A.cells}
-    BLOCK_dynamic(block_dynamic(), source, p, before, after, end_bit)
-    of (BITS(source, p, 5, hlit), BITS(source, p + 5, 5, hdist), BITS(source, p + 10, 4, hclen),
-        READ_LENGTHS3(source, p + 14, hclen + 4, values), CL_ORDER(order), CODE_LENGTHS_FROM(order, hclen + 4, values, 0, code_length_code),
-        LENGTHS_FIT(code_length_code, 7), LENGTHS_FULL(code_length_code, 7),
-        CODE_LENGTHS(code_length_code, source, p + 14 + 3 * (hclen + 4), $A.cnil(), hlit + 257 + hdist + 1, all_lengths, data_start),
-        $A.CLEN(litlen, hlit + 257), $A.APPEND(litlen, dist, all_lengths), LITLEN_USABLE(litlen), DIST_USABLE(dist),
-        SYMS(litlen, dist, source, data_start, before, after, end_bit))
-
-#pub prfun block_functional {kind:block_kind}{source:$A.cells}{p:nat}{before,first,second:$A.cells}{first_end,second_end:nat}
-  (BLOCK(kind, source, p, before, first, first_end), BLOCK(kind, source, p, before, second, second_end)): [first_end == second_end] $A.CELLS_EQ(first, second)
-
-(* BLOCKS(source, p, before, after): the blocks from bit p, ending at the
-   one with BFINAL 1, take the output before to after *)
-#pub dataprop BLOCKS($A.cells, int, $A.cells, $A.cells) =
-  | {source:$A.cells}{p,btype,end_bit:nat}{kind:block_kind}{before,after:$A.cells}
-    BLOCKS_last(source, p, before, after) of (BITS(source, p, 1, 1), BITS(source, p + 1, 2, btype), BTYPE(kind, btype), BLOCK(kind, source, p + 3, before, after, end_bit))
-  | {source:$A.cells}{p,btype,end_bit:nat}{kind:block_kind}{before,middle,after:$A.cells}
-    BLOCKS_next(source, p, before, after) of (BITS(source, p, 1, 0), BITS(source, p + 1, 2, btype), BTYPE(kind, btype), BLOCK(kind, source, p + 3, before, middle, end_bit), BLOCKS(source, end_bit, middle, after))
-
-#pub prfun blocks_functional {source:$A.cells}{p:nat}{before,first,second:$A.cells}
-  (BLOCKS(source, p, before, first), BLOCKS(source, p, before, second)): $A.CELLS_EQ(first, second)
-
-(* ============================================================
-   What inflating an entry's data gives, as a relation (quire#608, INFLATES)
-   ============================================================ *)
-
-(* How an entry's data is stored, as a static index: the method field 0
-   (stored) or 8 (deflated), as `compression` is its dynamic form *)
-#pub datasort inflate_kind =
-  | inflate_stored of ()
-  | inflate_deflated of ()
-
-(* INFLATES(kind, compressed, output): the entry's data, whose cells are
-   compressed, inflates to the cells output by the method kind. The stored
-   method (APPNOTE 4.4.5, method 0) keeps the bytes as they are. The
-   Deflated method's constructors are added by the pieces of quire#608
-   that follow (RFC 1951) *)
-#pub dataprop INFLATES(inflate_kind, $A.cells, $A.cells) =
-  | {cs:$A.cells} INFLATES_stored(inflate_stored(), cs, cs)
-  (* the Deflate stream (RFC 1951) from bit 0, with no output before it *)
-  | {compressed,output:$A.cells} INFLATES_deflated(inflate_deflated(), compressed, output) of BLOCKS(compressed, 0, $A.cnil(), output)
-
-(* The same compressed cells, by the same method, inflate to the same
-   output cells *)
-#pub prfun inflates_functional {kind:inflate_kind}{compressed,first,second:$A.cells}
-  (INFLATES(kind, compressed, first), INFLATES(kind, compressed, second)): CELLS_EQ(first, second)
-
-primplement inflates_functional {kind}{compressed,first,second} (first_proof, second_proof) =
-  case+ first_proof of
-  | INFLATES_stored() => (case+ second_proof of INFLATES_stored() => CELLS_EQ_refl())
-
-(* ============================================================
-   The window: what a back-reference is read from (zip#64)
-   ============================================================ *)
 
 (* Window storage (streaming window keyword): one barr of 65536 bytes, the last 32768 bytes of output plus the half being filled, well inside barr_alloc's bound; no arena.
    The decoder keeps a window, not the output: a back-reference reaches at
@@ -825,27 +683,6 @@ primplement inflates_functional {kind}{compressed,first,second} (first_proof, se
 #pub dataprop WINDOW($A.cells, $A.cells) =
   | {output,window:$A.cells} WINDOW_mk(output, window) of TAKE_LAST(output, 32768, window)
 
-#pub prfun window_functional {output,first,second:$A.cells} (WINDOW(output, first), WINDOW(output, second)): $A.CELLS_EQ(first, second)
-
-(* The window after appending data to the output: the last 32768 of the
-   window and the data, and it is the window of the output after *)
-#pub dataprop WINDOW_AFTER_APPEND($A.cells, $A.cells, $A.cells) =
-  | {window,data,next,both,next_window:$A.cells}
-    WINDOW_AFTER_APPEND_mk(window, data, next) of ($A.APPEND(window, data, both), TAKE_LAST(both, 32768, next_window), WINDOW(next, next_window))
-
-#pub prfun window_append {output,window,data,next:$A.cells}
-  (WINDOW(output, window), $A.APPEND(output, data, next)): WINDOW_AFTER_APPEND(window, data, next)
-
-(* A copy read from the window is the copy read from the output: the window
-   followed by the copied cells, cut to its last 32768, is the window of the
-   output after the copy *)
-#pub dataprop WINDOW_AFTER_COPY($A.cells, int, int, $A.cells) =
-  | {window,after,both,next_window:$A.cells}{distance,length:nat}
-    WINDOW_AFTER_COPY_mk(window, distance, length, after) of (COPY(window, distance, length, both), TAKE_LAST(both, 32768, next_window), WINDOW(after, next_window))
-
-#pub prfun window_copy {output,window,after:$A.cells}{distance,length:nat | distance <= 32768}
-  (WINDOW(output, window), COPY(output, distance, length, after)): WINDOW_AFTER_COPY(window, distance, length, after)
-
 (* The window lives in the decoder's 65536-byte barr: the last cells
    written are the window, starting at cell start of the barr's cells *)
 #pub dataprop WINDOW_IN_BUFFER($A.cells, int, $A.cells) =
@@ -858,95 +695,36 @@ primplement inflates_functional {kind}{compressed,first,second} (first_proof, se
 #pub prfun length_range {sym,extra_bits,base,value:nat}{source:$A.cells}{p:nat}
   (LENGTH_SYMBOL(sym, extra_bits, base), BITS(source, p, extra_bits, value)): [3 <= base + value; base + value <= 258] void
 
-(* ============================================================
-   The input in chunks: how a buffer relates to the consumed prefix (zip#64)
-   ============================================================ *)
-
-(* The compressed bytes are read from a reader in chunks (bats-lang/file#76,
-   item 5). Its index is the cells consumed so far, and at the end of the
-   file it closes, as the whole compressed sequence the proof talks about.
-   Bits read from a prefix are bits of the whole sequence: *)
-#pub prfun bits_in_prefix {prefix,rest,whole:$A.cells}{p,width,value:nat}
-  ($A.APPEND(prefix, rest, whole), BITS(prefix, p, width, value)): BITS(whole, p, width, value)
-#pub prfun hbits_in_prefix {prefix,rest,whole:$A.cells}{p,width,code:nat}
-  ($A.APPEND(prefix, rest, whole), HBITS(prefix, p, width, code)): HBITS(whole, p, width, code)
-
-(* BUFFER_AT(previous, chunk, consumed, start): the chunk in the decoder's
-   buffer was the last read, consumed is the cells before it and the chunk,
-   and the buffer's cell i is cell start + i of the consumed cells *)
-#pub dataprop BUFFER_AT($A.cells, $A.cells, $A.cells, int) =
-  | {previous,chunk,consumed:$A.cells}{start:nat} BUFFER_AT_mk(previous, chunk, consumed, start) of ($A.CLEN(previous, start), $A.APPEND(previous, chunk, consumed))
-
-#pub prfun buffer_nth {previous,chunk,consumed:$A.cells}{start,index,value:nat}
-  (BUFFER_AT(previous, chunk, consumed, start), $A.NTH(chunk, index, value)): $A.NTH(consumed, start + index, value)
-
-(* RESERVOIR(consumed, p, count, value): the bit reservoir the decoder holds
-   across chunks is the count bits from bit p of the consumed cells *)
-#pub dataprop RESERVOIR($A.cells, int, int, int) =
-  | {consumed:$A.cells}{p,count,value:nat} RESERVOIR_mk(consumed, p, count, value) of BITS(consumed, p, count, value)
 
 (* ============================================================
-   The decoders that return the proof (zip#64)
+   What inflating an entry's data gives, as a relation (quire#608, INFLATES)
    ============================================================ *)
 
-(* The decoders read the compressed bytes from a reader and stream the
-   output to a writer, keeping a small buffer, the bit reservoir and the
-   window. They are written against the file package's reader and writer
-   of bats-lang/file#76 (items 5 to 7), whose names this declares against
-   (the zip pull request relocks to the published file package):
-     $F.content_reader(consumed, start, limit): linear, opened at byte
-       start of the file with a byte limit (item 6), indexed by the cells
-       consumed so far, created at cnil();
-     $F.content_writer(written): linear, created at cnil();
-     reading a chunk into a borrowed buffer answers the reader at consumed
-       with the chunk appended ($A.APPEND), or the end of the file (the
-       limit), which closes the index with $F.FILE_READ(consumed, start,
-       limit): the consumed cells are the file's bytes [start, start +
-       limit), or a failed read;
-     writing a byte or run answers the writer with the cells appended, or
-       a failed write; $F.content_close answers $F.FILE_HOLDS(written) or
-       a failed close.
-   A call that fails consumes its handle (no proof of it); the decoder
-   consumes both handles and says the fate of each in its answer.
-   inflate_stored_proved takes the streams of stored blocks, inflate_proved
-   every Deflate stream. The input is the entry's data, size_in bytes from
-   byte start, and the output is at most 2147483647 bytes, the archive
-   check's bound: its cells have a count that is a natural number fitting
-   an int. *)
-#pub stadef INFLATE_OUTPUT_MOST = 2147483647
+(* How an entry's data is stored, as a static index: the method field 0
+   (stored) or 8 (deflated), as `compression` is its dynamic form *)
+#pub datasort inflate_kind =
+  | inflate_stored of ()
+  | inflate_deflated of ()
 
-(* What became of the reader of the range [start, start + size_in) when the decoder stopped *)
-#pub datavtype reader_fate(start:int, size_in:int) =
-  | {compressed:$A.cells}{start,size_in:nat} reader_ended(start, size_in) of ($F.FILE_READ(compressed, start, size_in) | )
-  | {start,size_in:nat} reader_closed_early(start, size_in) of ()
-  | {start,size_in:nat} reader_lost(start, size_in) of ($F.io_error)
+(* cells and cells are the same cells: the one constructor is the only way
+   to have it, so a lemma's conclusion that two outputs are the same is
+   this *)
+#pub dataprop CELLS_EQ($A.cells, $A.cells) =
+  | {cs:$A.cells} CELLS_EQ_refl(cs, cs)
 
-(* What became of the writer when the decoder stopped *)
-#pub datavtype writer_fate =
-  | {written:$A.cells} writer_held(written) of ($F.FILE_HOLDS(written) | )
-  | writer_lost of ($F.io_error)
+(* INFLATES(kind, compressed, output): the entry's data, whose cells are
+   compressed, inflates to the cells output by the method kind. The stored
+   method (APPNOTE 4.4.5, method 0) keeps the bytes as they are. The
+   Deflated method's constructors are added by the pieces of quire#608
+   that follow (RFC 1951) *)
+#pub dataprop INFLATES(inflate_kind, $A.cells, $A.cells) =
+  | {cs:$A.cells} INFLATES_stored(inflate_stored(), cs, cs)
 
-#pub datatype inflate_failure =
-  | failure_malformed
-  | failure_read
-  | failure_write
+(* The same compressed cells, by the same method, inflate to the same
+   output cells *)
+#pub prfun inflates_functional {kind:inflate_kind}{compressed,first,second:$A.cells}
+  (INFLATES(kind, compressed, first), INFLATES(kind, compressed, second)): CELLS_EQ(first, second)
 
-#pub datavtype inflated(start:int, size_in:int) =
-  (* the whole stream was decoded, the input read to its end and the output
-     is what the file holds *)
-  | {compressed,output:$A.cells}{start,size_in,size:nat | size <= INFLATE_OUTPUT_MOST}
-    inflated_done(start, size_in) of (INFLATES(inflate_deflated(), compressed, output), $A.CLEN(compressed, size_in), $A.CLEN(output, size),
-                      $F.FILE_READ(compressed, start, size_in), $F.FILE_HOLDS(output) | int size)
-  (* the whole stream was decoded and read, but the file did not close or a
-     write at the end failed: the INFLATES is proved, the file is not *)
-  | {compressed,output:$A.cells}{start,size_in:nat}
-    inflated_decoded_unsaved(start, size_in) of (INFLATES(inflate_deflated(), compressed, output), $F.FILE_READ(compressed, start, size_in) | $F.io_error)
-  (* the decoder stopped: why (malformed stream, failed read, failed write),
-     and what became of each handle *)
-  | {start,size_in:nat} inflated_stopped(start, size_in) of (inflate_failure, reader_fate(start, size_in), writer_fate)
-
-#pub fun inflate_stored_proved {start,size_in:nat}
-  (reader: $F.content_reader($A.cnil(), start, size_in), writer: $F.content_writer($A.cnil()), start: int start, size_in: int size_in): inflated(start, size_in)
-
-#pub fun inflate_proved {start,size_in:nat}
-  (reader: $F.content_reader($A.cnil(), start, size_in), writer: $F.content_writer($A.cnil()), start: int start, size_in: int size_in): inflated(start, size_in)
+primplement inflates_functional {kind}{compressed,first,second} (first_proof, second_proof) =
+  case+ first_proof of
+  | INFLATES_stored() => (case+ second_proof of INFLATES_stored() => CELLS_EQ_refl())

@@ -5,5 +5,4 @@ kind = "lib"
 [dependencies]
 "arith" = ""
 "array" = ""
-"file" = ""
 "result" = ""
