@@ -45,7 +45,12 @@ for d in "$ROOT"/tests/static/reject/*/; do
   [ -d "$d" ] || continue
   n=$(basename "$d")
   if check "$d"; then echo "FAIL reject/$n: should be rejected"; fail=1
-  elif grep -qF -- "$(cat "$d/expect")" "$TMP/$n.log"; then echo "ok   reject/$n"
+  elif python3 -B -I -c '
+import re, sys
+# solver stamps of 4 digits or more (second(11549)) count every declaration loaded before, so a new array version moves them: static-fixtures keyword
+mask = lambda t: re.sub(r"(\w)\(\d{4,}\)", r"\1(N)", t)
+sys.exit(0 if mask(open(sys.argv[1]).read().rstrip("\n")) in mask(open(sys.argv[2]).read()) else 1)
+' "$d/expect" "$TMP/$n.log"; then echo "ok   reject/$n"
   else echo "FAIL reject/$n: rejected, but not with: $(cat "$d/expect")"; grep -E 'error' "$TMP/$n.log" | head -5; fail=1; fi
 done
 # Every match is `case+`: a plain `case` (or `case-`) is not checked
