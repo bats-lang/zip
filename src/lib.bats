@@ -431,7 +431,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
    RFC 1951 as relations (quire#608, zip#64): the declarations
    ============================================================ *)
 
-(* cells and cells are the same cells: the one constructor is the only way
+(* Deprecated, CELLS_EQ keyword (array#82 owns the relation as $A.CELLS_EQ; zip's published form stays beside it for one version, the p2 removal ticket is filed with this change): cells and cells are the same cells: the one constructor is the only way
    to have it, so a lemma's conclusion that two outputs are the same is
    this *)
 #pub dataprop CELLS_EQ($A.cells, $A.cells) =
@@ -475,7 +475,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
 
 (* $A.APPEND(first, second, both) is array's, not zip's (decided: the cells and
    their relations are array's, the writer and reader of file build on array,
-   and zip takes the one APPEND all three share; array#TBD adds it with its
+   and zip takes the one APPEND all three share; array#82 adds it with its
    functional lemma; zip's own copy, never published, is dropped). The
    functional lemma is array's append_functional. *)
 
@@ -490,8 +490,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
   | {value:int}{rest:$A.cells} RUN_zero(0, value, rest, rest)
   | {count:nat}{value:int}{rest,all:$A.cells} RUN_cons(count + 1, value, rest, $A.ccons(value, all)) of RUN(count, value, rest, all)
 
-#pub prfun append_functional {first,second,both,other:$A.cells} ($A.APPEND(first, second, both), $A.APPEND(first, second, other)): CELLS_EQ(both, other)
-#pub prfun slice_functional {source:$A.cells}{start,width:nat}{first,second:$A.cells} (SLICE(source, start, width, first), SLICE(source, start, width, second)): CELLS_EQ(first, second)
+#pub prfun slice_functional {source:$A.cells}{start,width:nat}{first,second:$A.cells} (SLICE(source, start, width, first), SLICE(source, start, width, second)): $A.CELLS_EQ(first, second)
 
 (* The canonical Huffman code, RFC 1951 3.2.2: lengths is the code length of
    each symbol (cell s is the length of symbol s, 0 for none). *)
@@ -629,7 +628,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
   | {output,next,after:$A.cells}{output_count,distance,length,copied:nat | 1 <= distance; distance <= output_count}
     COPY_step(output, distance, length + 1, after) of ($A.CLEN(output, output_count), $A.NTH(output, output_count - distance, copied), $A.APPEND(output, $A.ccons(copied, $A.cnil()), next), COPY(next, distance, length, after))
 
-#pub prfun copy_functional {output:$A.cells}{distance,length:nat}{first,second:$A.cells} (COPY(output, distance, length, first), COPY(output, distance, length, second)): CELLS_EQ(first, second)
+#pub prfun copy_functional {output:$A.cells}{distance,length:nat}{first,second:$A.cells} (COPY(output, distance, length, first), COPY(output, distance, length, second)): $A.CELLS_EQ(first, second)
 
 (* SYMS(litlen, dist, source, p, before, after, end_bit): the symbols from
    bit p, decoded by the literal/length code litlen and the distance code
@@ -654,7 +653,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
         SYMS(litlen, dist, source, p + used + length_extra_bits + dist_used + dist_extra_bits, next, after, end_bit))
 
 #pub prfun syms_functional {litlen,dist,source:$A.cells}{p:nat}{output,first,second:$A.cells}{first_end,second_end:nat}
-  (LENGTHS_FIT(litlen, 15), LENGTHS_FIT(dist, 15), SYMS(litlen, dist, source, p, output, first, first_end), SYMS(litlen, dist, source, p, output, second, second_end)): [first_end == second_end] CELLS_EQ(first, second)
+  (LENGTHS_FIT(litlen, 15), LENGTHS_FIT(dist, 15), SYMS(litlen, dist, source, p, output, first, first_end), SYMS(litlen, dist, source, p, output, second, second_end)): [first_end == second_end] $A.CELLS_EQ(first, second)
 
 (* The dynamic block's header, RFC 1951 3.2.7 *)
 
@@ -729,7 +728,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
         RUN(11 + extra_value, 0, $A.cnil(), run), $A.APPEND(so_far, run, next), CODE_LENGTHS(code_length_code, source, p + used + 7, next, total, lengths, end_bit))
 
 #pub prfun code_lengths_functional {code_length_code,source:$A.cells}{p,total:nat}{so_far,first,second:$A.cells}{first_end,second_end:nat}
-  (LENGTHS_FIT(code_length_code, 7), CODE_LENGTHS(code_length_code, source, p, so_far, total, first, first_end), CODE_LENGTHS(code_length_code, source, p, so_far, total, second, second_end)): [first_end == second_end] CELLS_EQ(first, second)
+  (LENGTHS_FIT(code_length_code, 7), CODE_LENGTHS(code_length_code, source, p, so_far, total, first, first_end), CODE_LENGTHS(code_length_code, source, p, so_far, total, second, second_end)): [first_end == second_end] $A.CELLS_EQ(first, second)
 
 (* Blocks, RFC 1951 3.2.3 *)
 
@@ -766,7 +765,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
         SYMS(litlen, dist, source, data_start, before, after, end_bit))
 
 #pub prfun block_functional {kind:block_kind}{source:$A.cells}{p:nat}{before,first,second:$A.cells}{first_end,second_end:nat}
-  (BLOCK(kind, source, p, before, first, first_end), BLOCK(kind, source, p, before, second, second_end)): [first_end == second_end] CELLS_EQ(first, second)
+  (BLOCK(kind, source, p, before, first, first_end), BLOCK(kind, source, p, before, second, second_end)): [first_end == second_end] $A.CELLS_EQ(first, second)
 
 (* BLOCKS(source, p, before, after): the blocks from bit p, ending at the
    one with BFINAL 1, take the output before to after *)
@@ -777,7 +776,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
     BLOCKS_next(source, p, before, after) of (BITS(source, p, 1, 0), BITS(source, p + 1, 2, btype), BTYPE(kind, btype), BLOCK(kind, source, p + 3, before, middle, end_bit), BLOCKS(source, end_bit, middle, after))
 
 #pub prfun blocks_functional {source:$A.cells}{p:nat}{before,first,second:$A.cells}
-  (BLOCKS(source, p, before, first), BLOCKS(source, p, before, second)): CELLS_EQ(first, second)
+  (BLOCKS(source, p, before, first), BLOCKS(source, p, before, second)): $A.CELLS_EQ(first, second)
 
 (* ============================================================
    What inflating an entry's data gives, as a relation (quire#608, INFLATES)
@@ -826,7 +825,7 @@ primplement inflates_functional {kind}{compressed,first,second} (first_proof, se
 #pub dataprop WINDOW($A.cells, $A.cells) =
   | {output,window:$A.cells} WINDOW_mk(output, window) of TAKE_LAST(output, 32768, window)
 
-#pub prfun window_functional {output,first,second:$A.cells} (WINDOW(output, first), WINDOW(output, second)): CELLS_EQ(first, second)
+#pub prfun window_functional {output,first,second:$A.cells} (WINDOW(output, first), WINDOW(output, second)): $A.CELLS_EQ(first, second)
 
 (* The window after appending data to the output: the last 32768 of the
    window and the data, and it is the window of the output after *)
@@ -916,11 +915,11 @@ primplement inflates_functional {kind}{compressed,first,second} (first_proof, se
    an int. *)
 #pub stadef INFLATE_OUTPUT_MOST = 2147483647
 
-(* What became of the reader when the decoder stopped *)
-#pub datavtype reader_fate =
-  | {compressed:$A.cells}{start,size_in:nat} reader_ended(compressed) of ($F.FILE_READ(compressed, start, size_in) | )
-  | reader_closed_early of ()
-  | reader_lost of ($F.io_error)
+(* What became of the reader of the range [start, start + size_in) when the decoder stopped *)
+#pub datavtype reader_fate(start:int, size_in:int) =
+  | {compressed:$A.cells}{start,size_in:nat} reader_ended(start, size_in) of ($F.FILE_READ(compressed, start, size_in) | )
+  | {start,size_in:nat} reader_closed_early(start, size_in) of ()
+  | {start,size_in:nat} reader_lost(start, size_in) of ($F.io_error)
 
 (* What became of the writer when the decoder stopped *)
 #pub datavtype writer_fate =
@@ -932,22 +931,22 @@ primplement inflates_functional {kind}{compressed,first,second} (first_proof, se
   | failure_read
   | failure_write
 
-#pub datavtype inflated =
+#pub datavtype inflated(start:int, size_in:int) =
   (* the whole stream was decoded, the input read to its end and the output
      is what the file holds *)
   | {compressed,output:$A.cells}{start,size_in,size:nat | size <= INFLATE_OUTPUT_MOST}
-    inflated_done of (INFLATES(inflate_deflated(), compressed, output), $A.CLEN(compressed, size_in), $A.CLEN(output, size),
+    inflated_done(start, size_in) of (INFLATES(inflate_deflated(), compressed, output), $A.CLEN(compressed, size_in), $A.CLEN(output, size),
                       $F.FILE_READ(compressed, start, size_in), $F.FILE_HOLDS(output) | int size)
   (* the whole stream was decoded and read, but the file did not close or a
      write at the end failed: the INFLATES is proved, the file is not *)
   | {compressed,output:$A.cells}{start,size_in:nat}
-    inflated_decoded_unsaved of (INFLATES(inflate_deflated(), compressed, output), $F.FILE_READ(compressed, start, size_in) | $F.io_error)
+    inflated_decoded_unsaved(start, size_in) of (INFLATES(inflate_deflated(), compressed, output), $F.FILE_READ(compressed, start, size_in) | $F.io_error)
   (* the decoder stopped: why (malformed stream, failed read, failed write),
      and what became of each handle *)
-  | inflated_stopped of (inflate_failure, reader_fate, writer_fate)
+  | {start,size_in:nat} inflated_stopped(start, size_in) of (inflate_failure, reader_fate(start, size_in), writer_fate)
 
 #pub fun inflate_stored_proved {start,size_in:nat}
-  (reader: $F.content_reader($A.cnil(), start, size_in), writer: $F.content_writer($A.cnil()), start: int start, size_in: int size_in): inflated
+  (reader: $F.content_reader($A.cnil(), start, size_in), writer: $F.content_writer($A.cnil()), start: int start, size_in: int size_in): inflated(start, size_in)
 
 #pub fun inflate_proved {start,size_in:nat}
-  (reader: $F.content_reader($A.cnil(), start, size_in), writer: $F.content_writer($A.cnil()), start: int start, size_in: int size_in): inflated
+  (reader: $F.content_reader($A.cnil(), start, size_in), writer: $F.content_writer($A.cnil()), start: int start, size_in: int size_in): inflated(start, size_in)
