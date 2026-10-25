@@ -1,6 +1,6 @@
 [package]
-name = "inflates-functional-distinct"
-kind = "lib"
+name = "inflates_functional_distinct"
+kind = "bin"
 
 [dependencies]
 "array" = ""

@@ -1,1 +1,9 @@
-src/lib.bats: 314(line=6, offs=78) -- 334(line=6, offs=98): error(3): the dynamic expression cannot be assigned the type [S2Eapp(S2Ecst(INFLATES); S2Eapp(S2Ecst(inflate_deflated); ), S2Evar(cs(11547)), S2Evar(cs(11547)))].
+function _claimed
+line 6
+the dynamic expression cannot be assigned the type [S2Eapp(S2Ecst(INFLATES); S2Eapp(S2Ecst(inflate_deflated); ), S2Evar(cs(11980)), S2Evar(cs(11980)))].
+mismatch of static terms (equal):
+The actual term is: S2Eapp(S2Ecst(inflate_stored); )
+The needed term is: S2Eapp(S2Ecst(inflate_deflated); )
+mismatch of static terms (tyleq):
+The actual term is: S2Eapp(S2Ecst(INFLATES); S2Eapp(S2Ecst(inflate_stored); ), S2EVar(7920->S2Evar(cs(11980))), S2EVar(7920->S2Evar(cs(11980))))
+The needed term is: S2Eapp(S2Ecst(INFLATES); S2Eapp(S2Ecst(inflate_deflated); ), S2Evar(cs(11980)), S2Evar(cs(11980)))

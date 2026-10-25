@@ -4,3 +4,5 @@
 
 (* The stored constructor is the stored method's only *)
 prfn _claimed {cs:$A.cells} (): $Z.INFLATES($Z.inflate_deflated(), cs, cs) = $Z.INFLATES_stored()
+
+implement main0 () = ()

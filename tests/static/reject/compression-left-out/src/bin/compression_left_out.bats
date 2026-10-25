@@ -5,3 +5,5 @@
 fn _decoder_name (method: $Z.compression): string =
   case+ method of
   | $Z.Stored() => "stored"
+
+implement main0 () = ()

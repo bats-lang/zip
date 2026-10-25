@@ -1,1 +1,6 @@
-cannot be assigned the type [S2Ecst(compression)]
+function _data_of_method_8
+line 8
+the dynamic expression cannot be assigned the type [S2Ecst(compression)].
+mismatch of static terms (tyleq):
+The actual term is: S2Eapp(S2Ecst(g1int_int_t0ype); S2Eextkind(atstype_int), S2Eintinf(8))
+The needed term is: S2Ecst(compression)
