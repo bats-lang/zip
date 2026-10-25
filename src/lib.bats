@@ -803,16 +803,33 @@ primplement inflates_functional {kind}{compressed,first,second} (first_proof, se
   case+ first_proof of
   | INFLATES_stored() => (case+ second_proof of INFLATES_stored() => CELLS_EQ_refl())
 
-(* The decoders that return the proof (zip#64): a function over array's
-   barr that gives the output cells with INFLATES, or none for a stream it
-   cannot take. inflate_stored_proved takes the streams of stored blocks.
-   The sizes are any natural numbers: an empty output (a deflate stream of an empty file), and sizes up
-   to the 2 to the 31 minus 1 the archive check allows; what a barr can hold
-   is array's bound, which the implementation meets by refusing (none). *)
-#pub fun inflate_stored_proved {l:agz}{n:nat}{compressed:$A.cells}{size:nat}
-  (source: !$A.barr(l, n, compressed), n: int n, size: int size)
-  : $R.option([lo:agz][output:$A.cells] (INFLATES(inflate_deflated(), compressed, output) | $A.barr(lo, size, output)))
+(* The decoders that return the proof (zip#64): functions over array's
+   barr that give the output cells with INFLATES, or refuse a stream they
+   cannot take. inflate_stored_proved takes the streams of stored blocks,
+   inflate_proved every Deflate stream.
 
-#pub fun inflate_proved {l:agz}{n:nat}{compressed:$A.cells}{size:nat}
-  (source: !$A.barr(l, n, compressed), n: int n, size: int size)
-  : $R.option([lo:agz][output:$A.cells] (INFLATES(inflate_deflated(), compressed, output) | $A.barr(lo, size, output)))
+   The output goes to a destination the caller made: an empty output (a
+   deflate stream of an empty file; an array has at least one cell) is the
+   destination_empty constructor, and any other size is a piece of an arena
+   (array's arena_alloc, pieces up to ARENA_MOST, the largest class, so an
+   output over 1 MiB is a piece too). The answer gives the piece back, as a
+   barr with the proof of its cells and array's arrx_lent view, for
+   barr_to_arrx and arena_return; a refusal gives the piece back untouched. *)
+#pub datavtype destination(size:int, owner:addr) =
+  | destination_empty(0, owner) of ()
+  | {lo:agz}{size:pos} destination_piece(size, owner) of $A.arrx(byte, lo, size, owner)
+
+#pub datavtype inflated(compressed:$A.cells, size:int, owner:addr) =
+  | inflated_empty(compressed, 0, owner) of (INFLATES(inflate_deflated(), compressed, $A.cnil()) | )
+  | {lo:agz}{size:pos}{output:$A.cells}
+    inflated_piece(compressed, size, owner) of (INFLATES(inflate_deflated(), compressed, output), $A.CLEN(output, size), $A.arrx_lent(lo, size, owner) | $A.barr(lo, size, output))
+  | {lo:agz}{size:pos} inflated_refused_piece(compressed, size, owner) of $A.arrx(byte, lo, size, owner)
+  | inflated_refused_empty(compressed, 0, owner) of ()
+
+#pub fun inflate_stored_proved {l:agz}{n:nat}{compressed:$A.cells}{size:nat | size <= $A.ARENA_MOST}{owner:addr}
+  (source: !$A.barr(l, n, compressed), n: int n, size: int size, dest: destination(size, owner))
+  : inflated(compressed, size, owner)
+
+#pub fun inflate_proved {l:agz}{n:nat}{compressed:$A.cells}{size:nat | size <= $A.ARENA_MOST}{owner:addr}
+  (source: !$A.barr(l, n, compressed), n: int n, size: int size, dest: destination(size, owner))
+  : inflated(compressed, size, owner)
