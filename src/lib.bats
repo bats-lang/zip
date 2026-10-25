@@ -441,7 +441,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
 (* BIT(cells, p, bit): bit p of the cells *)
 #pub dataprop BIT($A.cells, int, int) =
   | {cs:$A.cells}{p,q,r,byte,b:nat | r < 8; p == 8 * q + r; b < 2}
-    BIT_mk(cs, p, b) of (NTH(cs, q, byte), BYTE_BIT(byte, r, b))
+    BIT_mk(cs, p, b) of ($A.NTH(cs, q, byte), BYTE_BIT(byte, r, b))
 
 (* BITS(cells, p, n, v): the n bits from bit p, data elements packed least
    significant bit first (3.1.1), are the number v (at most 16 bits, the
@@ -467,19 +467,19 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
 
 (* APPEND(first, second, both): both is first and then second *)
 #pub dataprop APPEND($A.cells, $A.cells, $A.cells) =
-  | {second:$A.cells} APPEND_nil(cnil(), second, second)
-  | {x:int}{first,second,both:$A.cells} APPEND_cons(ccons(x, first), second, ccons(x, both)) of APPEND(first, second, both)
+  | {second:$A.cells} APPEND_nil($A.cnil(), second, second)
+  | {x:int}{first,second,both:$A.cells} APPEND_cons($A.ccons(x, first), second, $A.ccons(x, both)) of APPEND(first, second, both)
 
 (* SLICE(cells, i, n, part): the n cells from cell i are part *)
 #pub dataprop SLICE($A.cells, int, int, $A.cells) =
-  | {cs:$A.cells}{i:nat} SLICE_nil(cs, i, 0, cnil())
+  | {cs:$A.cells}{i:nat} SLICE_nil(cs, i, 0, $A.cnil())
   | {cs:$A.cells}{i,n:nat}{c:int}{rest:$A.cells}
-    SLICE_cons(cs, i, n + 1, ccons(c, rest)) of (NTH(cs, i, c), SLICE(cs, i + 1, n, rest))
+    SLICE_cons(cs, i, n + 1, $A.ccons(c, rest)) of ($A.NTH(cs, i, c), SLICE(cs, i + 1, n, rest))
 
 (* RUN(n, v, rest, all): all is n cells v and then rest *)
 #pub dataprop RUN(int, int, $A.cells, $A.cells) =
   | {v:int}{rest:$A.cells} RUN_zero(0, v, rest, rest)
-  | {n:nat}{v:int}{rest,all:$A.cells} RUN_cons(n + 1, v, rest, ccons(v, all)) of RUN(n, v, rest, all)
+  | {n:nat}{v:int}{rest,all:$A.cells} RUN_cons(n + 1, v, rest, $A.ccons(v, all)) of RUN(n, v, rest, all)
 
 #pub prfun append_functional {first,second,both,other:$A.cells} (APPEND(first, second, both), APPEND(first, second, other)): CELLS_EQ(both, other)
 #pub prfun slice_functional {cs:$A.cells}{i,n:nat}{first,second:$A.cells} (SLICE(cs, i, n, first), SLICE(cs, i, n, second)): CELLS_EQ(first, second)
@@ -490,12 +490,12 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
 (* COUNT_BEFORE(lengths, i, len, k): k of the first i lengths are len *)
 #pub dataprop COUNT_BEFORE($A.cells, int, int, int) =
   | {lengths:$A.cells}{len:int} COUNT_BEFORE_zero(lengths, 0, len, 0)
-  | {rest:$A.cells}{i,k:nat}{len:int} COUNT_BEFORE_hit(ccons(len, rest), i + 1, len, k + 1) of COUNT_BEFORE(rest, i, len, k)
-  | {rest:$A.cells}{i,k:nat}{len,c:int | c != len} COUNT_BEFORE_miss(ccons(c, rest), i + 1, len, k) of COUNT_BEFORE(rest, i, len, k)
+  | {rest:$A.cells}{i,k:nat}{len:int} COUNT_BEFORE_hit($A.ccons(len, rest), i + 1, len, k + 1) of COUNT_BEFORE(rest, i, len, k)
+  | {rest:$A.cells}{i,k:nat}{len,c:int | c != len} COUNT_BEFORE_miss($A.ccons(c, rest), i + 1, len, k) of COUNT_BEFORE(rest, i, len, k)
 
 (* BL_COUNT(lengths, len, k): bl_count[len] of 3.2.2, k symbols have length len *)
 #pub dataprop BL_COUNT($A.cells, int, int) =
-  | {lengths:$A.cells}{n,len,k:nat | len >= 1} BL_COUNT_mk(lengths, len, k) of (CLEN(lengths, n), COUNT_BEFORE(lengths, n, len, k))
+  | {lengths:$A.cells}{n,len,k:nat | len >= 1} BL_COUNT_mk(lengths, len, k) of ($A.CLEN(lengths, n), COUNT_BEFORE(lengths, n, len, k))
 
 (* NEXT_CODE(lengths, len, c): next_code[len] of 3.2.2, the first code of length len *)
 #pub dataprop NEXT_CODE($A.cells, int, int) =
@@ -508,24 +508,24 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
    earlier symbol of that length *)
 #pub dataprop CODE($A.cells, int, int, int) =
   | {lengths:$A.cells}{sym,len,start,rank:nat | len >= 1; len <= 15}
-    CODE_mk(lengths, sym, start + rank, len) of (NTH(lengths, sym, len), NEXT_CODE(lengths, len, start), COUNT_BEFORE(lengths, sym, len, rank))
+    CODE_mk(lengths, sym, start + rank, len) of ($A.NTH(lengths, sym, len), NEXT_CODE(lengths, len, start), COUNT_BEFORE(lengths, sym, len, rank))
 
 (* LEN_FIT(lengths, maxlen): the codes of length 1 to maxlen are not
    over-subscribed, next_code[len] + bl_count[len] <= 2 to the len for each *)
 #pub dataprop LEN_FIT($A.cells, int) =
   | {lengths:$A.cells} LEN_FIT_zero(lengths, 0)
   | {lengths:$A.cells}{len,c,k,p:nat | c + k <= p}
-    LEN_FIT_step(lengths, len + 1) of (LEN_FIT(lengths, len), NEXT_CODE(lengths, len + 1, c), BL_COUNT(lengths, len + 1, k), POW2(len + 1, p))
+    LEN_FIT_step(lengths, len + 1) of (LEN_FIT(lengths, len), NEXT_CODE(lengths, len + 1, c), BL_COUNT(lengths, len + 1, k), $AR.POW2(len + 1, p))
 
 (* The shapes of a code that 3.2.7 and zlib take: complete (every code of
    maxlen bits is used), a single code of one bit, or no code at all *)
 #pub dataprop LENGTHS_FULL($A.cells, int) =
   | {lengths:$A.cells}{maxlen,c,k,p:nat | maxlen >= 1; c + k == p}
-    LENGTHS_FULL_mk(lengths, maxlen) of (NEXT_CODE(lengths, maxlen, c), BL_COUNT(lengths, maxlen, k), POW2(maxlen, p))
+    LENGTHS_FULL_mk(lengths, maxlen) of (NEXT_CODE(lengths, maxlen, c), BL_COUNT(lengths, maxlen, k), $AR.POW2(maxlen, p))
 #pub dataprop LENGTHS_SINGLE($A.cells) =
-  | {lengths:$A.cells}{n:pos} LENGTHS_SINGLE_mk(lengths) of (CLEN(lengths, n), COUNT_BEFORE(lengths, n, 0, n - 1), COUNT_BEFORE(lengths, n, 1, 1))
+  | {lengths:$A.cells}{n:pos} LENGTHS_SINGLE_mk(lengths) of ($A.CLEN(lengths, n), COUNT_BEFORE(lengths, n, 0, n - 1), COUNT_BEFORE(lengths, n, 1, 1))
 #pub dataprop LENGTHS_EMPTY($A.cells) =
-  | {lengths:$A.cells}{n:nat} LENGTHS_EMPTY_mk(lengths) of (CLEN(lengths, n), COUNT_BEFORE(lengths, n, 0, n))
+  | {lengths:$A.cells}{n:nat} LENGTHS_EMPTY_mk(lengths) of ($A.CLEN(lengths, n), COUNT_BEFORE(lengths, n, 0, n))
 
 (* The code of the literal/length alphabet and of the distance alphabet
    of a dynamic block: not over-subscribed, and complete or the single
@@ -570,22 +570,22 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
    symbol 285 is the length 258 alone *)
 #pub dataprop LENGTH_SYMBOL(int, int, int) =
   | {sym:int | 257 <= sym; sym <= 264} LENGTH_SYMBOL_short(sym, 0, sym - 254)
-  | {e,j,p:nat | 1 <= e; e <= 5; j < 4} LENGTH_SYMBOL_group(261 + 4 * e + j, e, (4 + j) * p + 3) of POW2(e, p)
+  | {e,j,p:nat | 1 <= e; e <= 5; j < 4} LENGTH_SYMBOL_group(261 + 4 * e + j, e, (4 + j) * p + 3) of $AR.POW2(e, p)
   | LENGTH_SYMBOL_last(285, 0, 258)
 
 (* DISTANCE_SYMBOL(sym, extra, base): distance symbol sym (0 to 29), the
    table of 3.2.5 *)
 #pub dataprop DISTANCE_SYMBOL(int, int, int) =
   | {sym:nat | sym < 4} DISTANCE_SYMBOL_short(sym, 0, sym + 1)
-  | {e,j,p:nat | 1 <= e; e <= 13; j < 2} DISTANCE_SYMBOL_group(2 * e + 2 + j, e, (2 + j) * p + 1) of POW2(e, p)
+  | {e,j,p:nat | 1 <= e; e <= 13; j < 2} DISTANCE_SYMBOL_group(2 * e + 2 + j, e, (2 + j) * p + 1) of $AR.POW2(e, p)
 
 (* FIXED_LITLEN(lengths) and FIXED_DIST(lengths): the code lengths of the
    fixed Huffman codes (3.2.6): 144 of 8 bits, 112 of 9, 24 of 7 and 8 of 8;
    and 32 distance codes of 5 bits *)
 #pub dataprop FIXED_LITLEN($A.cells) =
-  | {lengths,r1,r2,r3:$A.cells} FIXED_LITLEN_mk(lengths) of (RUN(144, 8, r1, lengths), RUN(112, 9, r2, r1), RUN(24, 7, r3, r2), RUN(8, 8, cnil(), r3))
+  | {lengths,r1,r2,r3:$A.cells} FIXED_LITLEN_mk(lengths) of (RUN(144, 8, r1, lengths), RUN(112, 9, r2, r1), RUN(24, 7, r3, r2), RUN(8, 8, $A.cnil(), r3))
 #pub dataprop FIXED_DIST($A.cells) =
-  | {lengths:$A.cells} FIXED_DIST_mk(lengths) of RUN(32, 5, cnil(), lengths)
+  | {lengths:$A.cells} FIXED_DIST_mk(lengths) of RUN(32, 5, $A.cnil(), lengths)
 
 (* COPY(before, distance, length, after): length bytes are each copied
    from distance back in the output so far, one after the other, so a
@@ -593,7 +593,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
 #pub dataprop COPY($A.cells, int, int, $A.cells) =
   | {output:$A.cells}{distance:int} COPY_done(output, distance, 0, output)
   | {output,next,after:$A.cells}{m,distance,n,v:nat | 1 <= distance; distance <= m}
-    COPY_step(output, distance, n + 1, after) of (CLEN(output, m), NTH(output, m - distance, v), APPEND(output, ccons(v, cnil()), next), COPY(next, distance, n, after))
+    COPY_step(output, distance, n + 1, after) of ($A.CLEN(output, m), $A.NTH(output, m - distance, v), APPEND(output, $A.ccons(v, $A.cnil()), next), COPY(next, distance, n, after))
 
 #pub prfun copy_functional {output:$A.cells}{distance,n:nat}{first,second:$A.cells} (COPY(output, distance, n, first), COPY(output, distance, n, second)): CELLS_EQ(first, second)
 
@@ -608,7 +608,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
   | {litlen,dist,cs:$A.cells}{p,sym,used,q:nat}{output,next,after:$A.cells}
     SYMS_literal(litlen, dist, cs, p, output, after, q)
     of (DECSYM(litlen, cs, p, sym, used), SYMBOL_CLASS(symbol_literal(), sym),
-        APPEND(output, ccons(sym, cnil()), next), SYMS(litlen, dist, cs, p + used, next, after, q))
+        APPEND(output, $A.ccons(sym, $A.cnil()), next), SYMS(litlen, dist, cs, p + used, next, after, q))
   | {litlen,dist,cs:$A.cells}{p,sym,used,length_extra,length_base,length_bits,dist_sym,dist_used,dist_extra,dist_base,dist_bits,q:nat}{output,next,after:$A.cells}
     SYMS_copy(litlen, dist, cs, p, output, after, q)
     of (DECSYM(litlen, cs, p, sym, used), SYMBOL_CLASS(symbol_length(), sym),
@@ -626,32 +626,32 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
 (* CL_ORDER(order): the order in which the code length code's lengths are
    stored: 16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15 *)
 #pub dataprop CL_ORDER($A.cells) =
-  | CL_ORDER_mk(ccons(16, ccons(17, ccons(18, ccons(0, ccons(8, ccons(7, ccons(9, ccons(6, ccons(10, ccons(5, ccons(11, ccons(4, ccons(12, ccons(3, ccons(13, ccons(2, ccons(14, ccons(1, ccons(15, cnil())))))))))))))))))))))
+  | CL_ORDER_mk($A.ccons(16, $A.ccons(17, $A.ccons(18, $A.ccons(0, $A.ccons(8, $A.ccons(7, $A.ccons(9, $A.ccons(6, $A.ccons(10, $A.ccons(5, $A.ccons(11, $A.ccons(4, $A.ccons(12, $A.ccons(3, $A.ccons(13, $A.ccons(2, $A.ccons(14, $A.ccons(1, $A.ccons(15, $A.cnil())))))))))))))))))))))
 
 (* READ_LENGTHS3(cs, p, n, values): n lengths of 3 bits each from bit p *)
 #pub dataprop READ_LENGTHS3($A.cells, int, int, $A.cells) =
-  | {cs:$A.cells}{p:nat} READ_LENGTHS3_nil(cs, p, 0, cnil())
+  | {cs:$A.cells}{p:nat} READ_LENGTHS3_nil(cs, p, 0, $A.cnil())
   | {cs:$A.cells}{p,n,v:nat}{rest:$A.cells}
-    READ_LENGTHS3_cons(cs, p, n + 1, ccons(v, rest)) of (BITS(cs, p, 3, v), READ_LENGTHS3(cs, p + 3, n, rest))
+    READ_LENGTHS3_cons(cs, p, n + 1, $A.ccons(v, rest)) of (BITS(cs, p, 3, v), READ_LENGTHS3(cs, p + 3, n, rest))
 
 (* NOT_IN_PREFIX(order, n, sym): sym is none of the first n cells of order *)
 #pub dataprop NOT_IN_PREFIX($A.cells, int, int) =
   | {order:$A.cells}{sym:int} NOT_IN_PREFIX_zero(order, 0, sym)
-  | {order:$A.cells}{n:nat}{c,sym:int | c != sym} NOT_IN_PREFIX_cons(ccons(c, order), n + 1, sym) of NOT_IN_PREFIX(order, n, sym)
+  | {order:$A.cells}{n:nat}{c,sym:int | c != sym} NOT_IN_PREFIX_cons($A.ccons(c, order), n + 1, sym) of NOT_IN_PREFIX(order, n, sym)
 
 (* CODE_LENGTH_OF(order, sym, n, values, len): the code length code gives
    symbol sym the length len: the value stored for it among the n read
    (value i belongs to symbol order[i]), or 0 when none is stored *)
 #pub dataprop CODE_LENGTH_OF($A.cells, int, int, $A.cells, int) =
-  | {order,values:$A.cells}{sym,i,n,len:nat} CODE_LENGTH_OF_stored(order, sym, n, values, len) of (NTH(order, i, sym), NTH(values, i, len))
+  | {order,values:$A.cells}{sym,i,n,len:nat} CODE_LENGTH_OF_stored(order, sym, n, values, len) of ($A.NTH(order, i, sym), $A.NTH(values, i, len))
   | {order,values:$A.cells}{sym,n:nat} CODE_LENGTH_OF_absent(order, sym, n, values, 0) of NOT_IN_PREFIX(order, n, sym)
 
 (* CODE_LENGTHS_FROM(order, n, values, s, lengths): lengths is the code
    length code's lengths of the symbols s to 18 *)
 #pub dataprop CODE_LENGTHS_FROM($A.cells, int, $A.cells, int, $A.cells) =
-  | {order,values:$A.cells}{n:nat} CODE_LENGTHS_FROM_end(order, n, values, 19, cnil())
+  | {order,values:$A.cells}{n:nat} CODE_LENGTHS_FROM_end(order, n, values, 19, $A.cnil())
   | {order,values,rest:$A.cells}{n,s,len:nat | s < 19}
-    CODE_LENGTHS_FROM_cons(order, n, values, s, ccons(len, rest)) of (CODE_LENGTH_OF(order, s, n, values, len), CODE_LENGTHS_FROM(order, n, values, s + 1, rest))
+    CODE_LENGTHS_FROM_cons(order, n, values, s, $A.ccons(len, rest)) of (CODE_LENGTH_OF(order, s, n, values, len), CODE_LENGTHS_FROM(order, n, values, s + 1, rest))
 
 (* What a code length symbol is (3.2.7) *)
 #pub datasort length_class =
@@ -671,23 +671,23 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
    there are total of them, lengths, ending at bit q; a repeat or run
    never goes past total, and the repeat of the previous length needs one *)
 #pub dataprop CODE_LENGTHS($A.cells, $A.cells, int, $A.cells, int, $A.cells, int) =
-  | {clc,cs:$A.cells}{p,total:nat}{so_far:$A.cells} CODE_LENGTHS_done(clc, cs, p, so_far, total, so_far, p) of CLEN(so_far, total)
+  | {clc,cs:$A.cells}{p,total:nat}{so_far:$A.cells} CODE_LENGTHS_done(clc, cs, p, so_far, total, so_far, p) of $A.CLEN(so_far, total)
   | {clc,cs:$A.cells}{p,total,m,sym,used,q:nat | m < total}{so_far,next,lengths:$A.cells}
     CODE_LENGTHS_literal(clc, cs, p, so_far, total, lengths, q)
-    of (CLEN(so_far, m), DECSYM(clc, cs, p, sym, used), LENGTH_CLASS(length_literal(), sym),
-        APPEND(so_far, ccons(sym, cnil()), next), CODE_LENGTHS(clc, cs, p + used, next, total, lengths, q))
+    of ($A.CLEN(so_far, m), DECSYM(clc, cs, p, sym, used), LENGTH_CLASS(length_literal(), sym),
+        APPEND(so_far, $A.ccons(sym, $A.cnil()), next), CODE_LENGTHS(clc, cs, p + used, next, total, lengths, q))
   | {clc,cs:$A.cells}{p,total,m,used,x,q,v:nat | 1 <= m; m + 3 + x <= total}{so_far,run,next,lengths:$A.cells}
     CODE_LENGTHS_repeat_previous(clc, cs, p, so_far, total, lengths, q)
-    of (CLEN(so_far, m), DECSYM(clc, cs, p, 16, used), BITS(cs, p + used, 2, x), NTH(so_far, m - 1, v),
-        RUN(3 + x, v, cnil(), run), APPEND(so_far, run, next), CODE_LENGTHS(clc, cs, p + used + 2, next, total, lengths, q))
+    of ($A.CLEN(so_far, m), DECSYM(clc, cs, p, 16, used), BITS(cs, p + used, 2, x), $A.NTH(so_far, m - 1, v),
+        RUN(3 + x, v, $A.cnil(), run), APPEND(so_far, run, next), CODE_LENGTHS(clc, cs, p + used + 2, next, total, lengths, q))
   | {clc,cs:$A.cells}{p,total,m,used,x,q:nat | m + 3 + x <= total}{so_far,run,next,lengths:$A.cells}
     CODE_LENGTHS_zeros_short(clc, cs, p, so_far, total, lengths, q)
-    of (CLEN(so_far, m), DECSYM(clc, cs, p, 17, used), BITS(cs, p + used, 3, x),
-        RUN(3 + x, 0, cnil(), run), APPEND(so_far, run, next), CODE_LENGTHS(clc, cs, p + used + 3, next, total, lengths, q))
+    of ($A.CLEN(so_far, m), DECSYM(clc, cs, p, 17, used), BITS(cs, p + used, 3, x),
+        RUN(3 + x, 0, $A.cnil(), run), APPEND(so_far, run, next), CODE_LENGTHS(clc, cs, p + used + 3, next, total, lengths, q))
   | {clc,cs:$A.cells}{p,total,m,used,x,q:nat | m + 11 + x <= total}{so_far,run,next,lengths:$A.cells}
     CODE_LENGTHS_zeros_long(clc, cs, p, so_far, total, lengths, q)
-    of (CLEN(so_far, m), DECSYM(clc, cs, p, 18, used), BITS(cs, p + used, 7, x),
-        RUN(11 + x, 0, cnil(), run), APPEND(so_far, run, next), CODE_LENGTHS(clc, cs, p + used + 7, next, total, lengths, q))
+    of ($A.CLEN(so_far, m), DECSYM(clc, cs, p, 18, used), BITS(cs, p + used, 7, x),
+        RUN(11 + x, 0, $A.cnil(), run), APPEND(so_far, run, next), CODE_LENGTHS(clc, cs, p + used + 7, next, total, lengths, q))
 
 #pub prfun code_lengths_functional {clc,cs:$A.cells}{p,total:nat}{so_far,first,second:$A.cells}{q1,q2:nat}
   (LEN_FIT(clc, 7), CODE_LENGTHS(clc, cs, p, so_far, total, first, q1), CODE_LENGTHS(clc, cs, p, so_far, total, second, q2)): [q1 == q2] CELLS_EQ(first, second)
@@ -722,8 +722,8 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
     of (BITS(cs, p, 5, hlit), BITS(cs, p + 5, 5, hdist), BITS(cs, p + 10, 4, hclen),
         READ_LENGTHS3(cs, p + 14, hclen + 4, values), CL_ORDER(order), CODE_LENGTHS_FROM(order, hclen + 4, values, 0, clc),
         LEN_FIT(clc, 7), LENGTHS_FULL(clc, 7),
-        CODE_LENGTHS(clc, cs, p + 14 + 3 * (hclen + 4), cnil(), hlit + 257 + hdist + 1, all_lengths, q0),
-        CLEN(litlen, hlit + 257), APPEND(litlen, dist, all_lengths), LITLEN_USABLE(litlen), DIST_USABLE(dist),
+        CODE_LENGTHS(clc, cs, p + 14 + 3 * (hclen + 4), $A.cnil(), hlit + 257 + hdist + 1, all_lengths, q0),
+        $A.CLEN(litlen, hlit + 257), APPEND(litlen, dist, all_lengths), LITLEN_USABLE(litlen), DIST_USABLE(dist),
         SYMS(litlen, dist, cs, q0, before, after, q))
 
 #pub prfun block_functional {kind:block_kind}{cs:$A.cells}{p:nat}{before,first,second:$A.cells}{q1,q2:nat}
@@ -764,7 +764,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
 #pub dataprop INFLATES(inflate_kind, $A.cells, $A.cells) =
   | {cs:$A.cells} INFLATES_stored(inflate_stored(), cs, cs)
   (* the Deflate stream (RFC 1951) from bit 0, with no output before it *)
-  | {cs,output:$A.cells} INFLATES_deflated(inflate_deflated(), cs, output) of BLOCKS(cs, 0, cnil(), output)
+  | {cs,output:$A.cells} INFLATES_deflated(inflate_deflated(), cs, output) of BLOCKS(cs, 0, $A.cnil(), output)
 
 (* The same compressed cells, by the same method, inflate to the same
    output cells *)
