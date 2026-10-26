@@ -1,6 +1,6 @@
 [package]
-name = "method-as-int"
-kind = "lib"
+name = "method_as_int"
+kind = "bin"
 
 [dependencies]
 "array" = ""

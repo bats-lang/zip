@@ -1,6 +1,6 @@
 [package]
-name = "compression-left-out"
-kind = "lib"
+name = "compression_left_out"
+kind = "bin"
 
 [dependencies]
 "zip" = ""

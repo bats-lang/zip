@@ -1,6 +1,6 @@
 [package]
-name = "inflates-functional-other-method"
-kind = "lib"
+name = "inflates_functional_other_method"
+kind = "bin"
 
 [dependencies]
 "array" = ""

@@ -1,6 +1,6 @@
 [package]
-name = "inflates-stored-other-output"
-kind = "lib"
+name = "inflates_stored_other_output"
+kind = "bin"
 
 [dependencies]
 "array" = ""

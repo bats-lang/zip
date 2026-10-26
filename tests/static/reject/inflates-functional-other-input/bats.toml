@@ -1,6 +1,6 @@
 [package]
-name = "inflates-functional-other-input"
-kind = "lib"
+name = "inflates_functional_other_input"
+kind = "bin"
 
 [dependencies]
 "array" = ""
