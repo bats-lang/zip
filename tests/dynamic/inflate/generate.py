@@ -8,7 +8,9 @@ chapters) can only come from zlib; a decoder tested on streams of its own
 making would test nothing about RFC 1951. The hand-made fixed-code streams
 below are bit strings written by `Bits`; zlib decides what they inflate to.
 
-usage: generate.py QUIRE_CHECKOUT OUT_DIR   (python3, the standard library only)
+usage: generate.py QUIRE_CHECKOUT OUT_DIR [CHAPTER_DIR]   (python3, the standard library only)
+With CHAPTER_DIR it also writes the 1 MiB chapter of the wasm speed measure there: chapter.deflate and
+chapter.expect (sha256, size, compressed size).
 Writes OUT_DIR/data/NN.deflate and NN.expect, OUT_DIR/refuse/NN.deflate and
 NN.expect, and the two cases.txt that name each stream.
   data   NN.expect is "<s|o> <sha256 of zlib's output, 64 hex digits> <its size>":
@@ -213,6 +215,18 @@ def data_cases(quire):
     return cases
 
 
+def chapter(quire):
+    """The 1 MiB chapter of the speed measure: the XHTML of the three EPUBs' chapters, repeated and cut to exactly 1048576 bytes."""
+    pages = []
+    for epub in EPUBS:
+        with zipfile.ZipFile(os.path.join(quire, epub)) as z:
+            for info in z.infolist():
+                if info.filename.endswith('.xhtml') or info.filename.endswith('.html'):
+                    pages.append(z.read(info))
+    body = b''.join(pages)
+    return (body * (1048576 // len(body) + 1))[:1048576]
+
+
 def refuse_cases(data):
     fixed_text = raw_deflate(text(1, 5000), 6, zlib.Z_FIXED)
     dynamic_text = raw_deflate(text(3, 60000), 6)
@@ -275,6 +289,16 @@ def main(argv):
         listing.append('%02d %s' % (index, description))
     with open(os.path.join(refuse, 'cases.txt'), 'w') as f:
         f.write('\n'.join(listing) + '\n')
+    if len(argv) > 3:  # the speed measure's chapter (step 10 of zip#64), in its own directory
+        os.makedirs(argv[3], exist_ok=True)
+        output = chapter(quire)
+        stream = raw_deflate(output, 6)
+        assert inflate(stream) == output and len(output) == 1048576
+        with open(os.path.join(argv[3], 'chapter.deflate'), 'wb') as f:
+            f.write(stream)
+        with open(os.path.join(argv[3], 'chapter.expect'), 'w') as f:
+            f.write('%s %d %d\n' % (hashlib.sha256(output).hexdigest(), len(output), len(stream)))
+        print('chapter:', open(os.path.join(argv[3], 'chapter.expect')).read().strip())
     print('data cases:', len(data_cases(quire)), 'first block stored/fixed/dynamic:', kinds[0], kinds[1], kinds[2])
     print('refuse cases:', len(listing))
 

@@ -1,0 +1,11 @@
+[package]
+name = "inflate_speed"
+kind = "bin"
+unsafe = true
+
+[dependencies]
+"array" = ""
+"arith" = ""
+"result" = ""
+"sha256" = ""
+"zip" = ""

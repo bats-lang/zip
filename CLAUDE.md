@@ -137,6 +137,16 @@ compressor, and a decoder tested on streams of its own making would test nothing
 zlib's own output and it checks that zlib refuses each refusal stream. The test counts the kind of each stream's first
 block and fails when a kind has none.
 
+## The speed of inflate_cells_proved in wasm (bats-lang/zip#64; keyword: inflate-speed)
+
+`tests/wasm/inflate-speed` is a test-only package (never published; `unsafe = true` only to take the stream's bytes from
+the host through the module's memory) built as `bats build --only release --only wasm`; `run.mjs` (Node) writes the
+compressed chapter into the room `bats_inflate_prepare` gives and times only `bats_inflate_run` with `performance.now()`:
+one warm-up and five runs, the median reported, the output's size and sha256 checked against zlib's. The chapter is exactly
+1048576 bytes of output (the XHTML of the three EPUBs' chapters, repeated and cut), deflated by zlib at level 6 to 336388
+bytes (`generate.py` makes it). Measured on 2026-10-27 (Node v22.22.0, Intel Xeon 2.10 GHz, Linux 6.18, a shared machine):
+five runs 166.1, 170.8, 176.5, 194.8 and 188.0 ms, **median 176.5 ms**. The module imports nothing (no symbol of file).
+
 ## The lemmas are mutation-checked under the infinite-precision solver (bats-lang/quire#594)
 
 The 32-bit solver can make a proof's context contradictory, so a lemma proves
