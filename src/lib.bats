@@ -886,6 +886,65 @@ primplement decsym_functional {lengths,source}{maxlen,p,first_sym,first_used,sec
   | BTYPE_fixed(block_fixed(), 1)
   | BTYPE_dynamic(block_dynamic(), 2)
 
+(* COPY(before, distance, length, after): length bytes are each copied
+   from distance back in the output so far, one after the other, so a
+   copy with distance < length reads bytes it has just written *)
+#pub dataprop COPY($A.cells, int, int, $A.cells) =
+  | {output:$A.cells}{distance:int} COPY_done(output, distance, 0, output)
+  | {output,next,after:$A.cells}{output_count,distance,length,copied:nat | 1 <= distance; distance <= output_count}
+    COPY_step(output, distance, length + 1, after) of ($A.CLEN(output, output_count), $A.NTH(output, output_count - distance, copied), $A.APPEND(output, $A.ccons(copied, $A.cnil()), next), COPY(next, distance, length, after))
+
+#pub prfun copy_functional {output:$A.cells}{distance,length:nat}{first,second:$A.cells}
+  (COPY(output, distance, length, first), COPY(output, distance, length, second)): $A.CELLS_EQ(first, second)
+
+(* SYMS_SIZED(litlen, dist, source, p, before, after, end_bit, symbols): the symbols
+   from bit p, decoded by the literal/length code litlen and the distance code
+   dist, up to the end-of-block symbol, take the output before to after, the
+   end-of-block symbol ends at bit end_bit, and there are symbols + 1 of them (the
+   count is what a lemma's termination metric reads, as BLOCKS_SIZED). A literal
+   appends itself; a length symbol, its extra bits, a distance symbol and its
+   extra bits are a copy. *)
+#pub dataprop SYMS_SIZED($A.cells, $A.cells, $A.cells, int, $A.cells, $A.cells, int, int) =
+  | {litlen,dist,source:$A.cells}{p,sym,used:nat}{output:$A.cells}
+    SYMS_SIZED_end(litlen, dist, source, p, output, output, p + used, 0) of (DECSYM(litlen, source, p, sym, used), SYMBOL_CLASS(symbol_end_of_block(), sym))
+  | {litlen,dist,source:$A.cells}{p,sym,used,end_bit,symbols:nat}{output,next,after:$A.cells}
+    SYMS_SIZED_literal(litlen, dist, source, p, output, after, end_bit, symbols + 1)
+    of (DECSYM(litlen, source, p, sym, used), SYMBOL_CLASS(symbol_literal(), sym),
+        $A.APPEND(output, $A.ccons(sym, $A.cnil()), next), SYMS_SIZED(litlen, dist, source, p + used, next, after, end_bit, symbols))
+  | {litlen,dist,source:$A.cells}{p,sym,used,length_extra_bits,length_base,length_extra_value,dist_sym,dist_used,dist_extra_bits,dist_base,dist_extra_value,end_bit,symbols:nat | sym == 285 || length_base + length_extra_value <= 257}{output,next,after:$A.cells}
+    SYMS_SIZED_copy(litlen, dist, source, p, output, after, end_bit, symbols + 1)
+    of (DECSYM(litlen, source, p, sym, used), SYMBOL_CLASS(symbol_length(), sym),
+        LENGTH_SYMBOL(sym, length_extra_bits, length_base), BITS(source, p + used, length_extra_bits, length_extra_value),
+        DECSYM(dist, source, p + used + length_extra_bits, dist_sym, dist_used), DISTANCE_SYMBOL(dist_sym, dist_extra_bits, dist_base),
+        BITS(source, p + used + length_extra_bits + dist_used, dist_extra_bits, dist_extra_value),
+        COPY(output, dist_base + dist_extra_value, length_base + length_extra_value, next),
+        SYMS_SIZED(litlen, dist, source, p + used + length_extra_bits + dist_used + dist_extra_bits, next, after, end_bit, symbols))
+
+(* SYMS(litlen, dist, source, p, before, after, end_bit): the symbols from bit p
+   take the output before to after and the end-of-block symbol ends at end_bit.
+   Made by SYMS_end, SYMS_literal and SYMS_copy below. *)
+#pub dataprop SYMS($A.cells, $A.cells, $A.cells, int, $A.cells, $A.cells, int) =
+  | {litlen,dist,source:$A.cells}{p:nat}{before,after:$A.cells}{end_bit,symbols:nat}
+    SYMS_made(litlen, dist, source, p, before, after, end_bit) of SYMS_SIZED(litlen, dist, source, p, before, after, end_bit, symbols)
+
+#pub prfun SYMS_end {litlen,dist,source:$A.cells}{p,sym,used:nat}{output:$A.cells}
+  (DECSYM(litlen, source, p, sym, used), SYMBOL_CLASS(symbol_end_of_block(), sym)): SYMS(litlen, dist, source, p, output, output, p + used)
+
+#pub prfun SYMS_literal {litlen,dist,source:$A.cells}{p,sym,used,end_bit:nat}{output,next,after:$A.cells}
+  (DECSYM(litlen, source, p, sym, used), SYMBOL_CLASS(symbol_literal(), sym), $A.APPEND(output, $A.ccons(sym, $A.cnil()), next),
+   SYMS(litlen, dist, source, p + used, next, after, end_bit)): SYMS(litlen, dist, source, p, output, after, end_bit)
+
+#pub prfun SYMS_copy {litlen,dist,source:$A.cells}{p,sym,used,length_extra_bits,length_base,length_extra_value,dist_sym,dist_used,dist_extra_bits,dist_base,dist_extra_value,end_bit:nat | sym == 285 || length_base + length_extra_value <= 257}{output,next,after:$A.cells}
+  (DECSYM(litlen, source, p, sym, used), SYMBOL_CLASS(symbol_length(), sym),
+   LENGTH_SYMBOL(sym, length_extra_bits, length_base), BITS(source, p + used, length_extra_bits, length_extra_value),
+   DECSYM(dist, source, p + used + length_extra_bits, dist_sym, dist_used), DISTANCE_SYMBOL(dist_sym, dist_extra_bits, dist_base),
+   BITS(source, p + used + length_extra_bits + dist_used, dist_extra_bits, dist_extra_value),
+   COPY(output, dist_base + dist_extra_value, length_base + length_extra_value, next),
+   SYMS(litlen, dist, source, p + used + length_extra_bits + dist_used + dist_extra_bits, next, after, end_bit)): SYMS(litlen, dist, source, p, output, after, end_bit)
+
+#pub prfun syms_functional {litlen,dist,source:$A.cells}{p:nat}{output,first,second:$A.cells}{first_end,second_end:nat}
+  (LENGTHS_FIT(litlen, 15), LENGTHS_FIT(dist, 15), SYMS(litlen, dist, source, p, output, first, first_end), SYMS(litlen, dist, source, p, output, second, second_end)): [first_end == second_end] $A.CELLS_EQ(first, second)
+
 (* BLOCK(kind, source, p, before, after, end_bit): a block of the kind whose
    body starts at bit p (after its 3 header bits) takes the output before to
    after, and ends at bit end_bit. A constructor for each kind: the stored one
@@ -895,6 +954,9 @@ primplement decsym_functional {lengths,source}{maxlen,p,first_sym,first_used,sec
   | {source:$A.cells}{p,data_byte,len,nlen:nat | 8 * data_byte >= p; 8 * data_byte < p + 8; len + nlen == 65535}{before,data,after:$A.cells}
     BLOCK_stored(block_stored(), source, p, before, after, 8 * (data_byte + 4 + len))
     of (BITS(source, 8 * data_byte, 16, len), BITS(source, 8 * data_byte + 16, 16, nlen), SLICE(source, data_byte + 4, len, data), $A.APPEND(before, data, after))
+  | {source,litlen,dist:$A.cells}{p,end_bit:nat}{before,after:$A.cells}
+    BLOCK_fixed(block_fixed(), source, p, before, after, end_bit)
+    of (FIXED_LITLEN(litlen), FIXED_DIST(dist), LENGTHS_FIT(litlen, 15), LENGTHS_FIT(dist, 15), SYMS(litlen, dist, source, p, before, after, end_bit))
 
 #pub prfun slice_functional {source:$A.cells}{start,width:nat}{first,second:$A.cells}
   (SLICE(source, start, width, first), SLICE(source, start, width, second)): $A.CELLS_EQ(first, second)
@@ -939,6 +1001,216 @@ prfun _slice_functional {source:$A.cells}{start,width:nat}{first,second:$A.cells
 
 primplement slice_functional {source}{start,width}{first,second} (first_slice, second_slice) = _slice_functional(first_slice, second_slice)
 
+(* Proofs of the compressed data's symbols (keyword: symbols) *)
+
+prfun _copy_functional {output:$A.cells}{distance,length:nat}{first,second:$A.cells} .<length>.
+  (first_copy: COPY(output, distance, length, first), second_copy: COPY(output, distance, length, second)): $A.CELLS_EQ(first, second) =
+  case+ first_copy of
+  | COPY_done() => (case+ second_copy of COPY_done() => $A.CELLS_EQ_refl())
+  | COPY_step(first_len, first_nth, first_append, first_rest) =>
+    (case+ second_copy of
+     | COPY_step(second_len, second_nth, second_append, second_rest) =>
+       (let
+          prval () = _clen_functional(first_len, second_len)
+          prval () = $A.nth_functional(first_nth, second_nth)
+        in
+          (case+ $A.append_functional(first_append, second_append) of
+           | $A.CELLS_EQ_refl() => _copy_functional(first_rest, second_rest))
+        end))
+
+primplement copy_functional {output}{distance,length}{first,second} (first_copy, second_copy) = _copy_functional(first_copy, second_copy)
+
+prfun _pow2_functional {k,first,second:nat} .<k>.
+  (first_pow: $AR.POW2(k, first), second_pow: $AR.POW2(k, second)): [first == second] void =
+  case+ first_pow of
+  | $AR.POW2_zero() => (case+ second_pow of $AR.POW2_zero() => ())
+  | $AR.POW2_succ(first_rest) => (case+ second_pow of $AR.POW2_succ(second_rest) => _pow2_functional(first_rest, second_rest))
+
+prfn _length_symbol_functional {sym,first_extra,first_base,second_extra,second_base:nat}
+  (first: LENGTH_SYMBOL(sym, first_extra, first_base), second: LENGTH_SYMBOL(sym, second_extra, second_base)): [first_extra == second_extra; first_base == second_base] void =
+  case+ first of
+  | LENGTH_SYMBOL_short() =>
+    (case+ second of
+     | LENGTH_SYMBOL_short() => ()
+     | LENGTH_SYMBOL_base_4_times(second_pow) => ()
+     | LENGTH_SYMBOL_base_5_times(second_pow) => ()
+     | LENGTH_SYMBOL_base_6_times(second_pow) => ()
+     | LENGTH_SYMBOL_base_7_times(second_pow) => ()
+     | LENGTH_SYMBOL_last() => ())
+  | LENGTH_SYMBOL_base_4_times(first_pow) =>
+    (case+ second of
+     | LENGTH_SYMBOL_short() => ()
+     | LENGTH_SYMBOL_base_4_times(second_pow) => _pow2_functional(first_pow, second_pow)
+     | LENGTH_SYMBOL_base_5_times(second_pow) => ()
+     | LENGTH_SYMBOL_base_6_times(second_pow) => ()
+     | LENGTH_SYMBOL_base_7_times(second_pow) => ()
+     | LENGTH_SYMBOL_last() => ())
+  | LENGTH_SYMBOL_base_5_times(first_pow) =>
+    (case+ second of
+     | LENGTH_SYMBOL_short() => ()
+     | LENGTH_SYMBOL_base_4_times(second_pow) => ()
+     | LENGTH_SYMBOL_base_5_times(second_pow) => _pow2_functional(first_pow, second_pow)
+     | LENGTH_SYMBOL_base_6_times(second_pow) => ()
+     | LENGTH_SYMBOL_base_7_times(second_pow) => ()
+     | LENGTH_SYMBOL_last() => ())
+  | LENGTH_SYMBOL_base_6_times(first_pow) =>
+    (case+ second of
+     | LENGTH_SYMBOL_short() => ()
+     | LENGTH_SYMBOL_base_4_times(second_pow) => ()
+     | LENGTH_SYMBOL_base_5_times(second_pow) => ()
+     | LENGTH_SYMBOL_base_6_times(second_pow) => _pow2_functional(first_pow, second_pow)
+     | LENGTH_SYMBOL_base_7_times(second_pow) => ()
+     | LENGTH_SYMBOL_last() => ())
+  | LENGTH_SYMBOL_base_7_times(first_pow) =>
+    (case+ second of
+     | LENGTH_SYMBOL_short() => ()
+     | LENGTH_SYMBOL_base_4_times(second_pow) => ()
+     | LENGTH_SYMBOL_base_5_times(second_pow) => ()
+     | LENGTH_SYMBOL_base_6_times(second_pow) => ()
+     | LENGTH_SYMBOL_base_7_times(second_pow) => _pow2_functional(first_pow, second_pow)
+     | LENGTH_SYMBOL_last() => ())
+  | LENGTH_SYMBOL_last() =>
+    (case+ second of
+     | LENGTH_SYMBOL_short() => ()
+     | LENGTH_SYMBOL_base_4_times(second_pow) => ()
+     | LENGTH_SYMBOL_base_5_times(second_pow) => ()
+     | LENGTH_SYMBOL_base_6_times(second_pow) => ()
+     | LENGTH_SYMBOL_base_7_times(second_pow) => ()
+     | LENGTH_SYMBOL_last() => ())
+
+prfn _distance_symbol_functional {sym,first_extra,first_base,second_extra,second_base:nat}
+  (first: DISTANCE_SYMBOL(sym, first_extra, first_base), second: DISTANCE_SYMBOL(sym, second_extra, second_base)): [first_extra == second_extra; first_base == second_base] void =
+  case+ first of
+  | DISTANCE_SYMBOL_short() =>
+    (case+ second of
+     | DISTANCE_SYMBOL_short() => ()
+     | DISTANCE_SYMBOL_base_2_times(second_pow) => ()
+     | DISTANCE_SYMBOL_base_3_times(second_pow) => ())
+  | DISTANCE_SYMBOL_base_2_times(first_pow) =>
+    (case+ second of
+     | DISTANCE_SYMBOL_short() => ()
+     | DISTANCE_SYMBOL_base_2_times(second_pow) => _pow2_functional(first_pow, second_pow)
+     | DISTANCE_SYMBOL_base_3_times(second_pow) => ())
+  | DISTANCE_SYMBOL_base_3_times(first_pow) =>
+    (case+ second of
+     | DISTANCE_SYMBOL_short() => ()
+     | DISTANCE_SYMBOL_base_2_times(second_pow) => ()
+     | DISTANCE_SYMBOL_base_3_times(second_pow) => _pow2_functional(first_pow, second_pow))
+
+prfn _class_end_value {sym:nat} (class: SYMBOL_CLASS(symbol_end_of_block(), sym)): [sym == 256] void =
+  case+ class of SYMBOL_CLASS_end_of_block() => ()
+
+prfn _class_literal_value {sym:nat} (class: SYMBOL_CLASS(symbol_literal(), sym)): [sym <= 255] void =
+  case+ class of SYMBOL_CLASS_literal() => ()
+
+prfn _class_length_value {sym:nat} (class: SYMBOL_CLASS(symbol_length(), sym)): [257 <= sym; sym <= 285] void =
+  case+ class of SYMBOL_CLASS_length() => ()
+
+prfun _syms_sized_functional {litlen,dist,source:$A.cells}{p:nat}{output,first,second:$A.cells}{first_end,second_end,first_symbols,second_symbols:nat} .<first_symbols>.
+  (litlen_fit: LENGTHS_FIT(litlen, 15), dist_fit: LENGTHS_FIT(dist, 15),
+   first_proof: SYMS_SIZED(litlen, dist, source, p, output, first, first_end, first_symbols),
+   second_proof: SYMS_SIZED(litlen, dist, source, p, output, second, second_end, second_symbols))
+  : [first_end == second_end] $A.CELLS_EQ(first, second) =
+  case+ first_proof of
+  | SYMS_SIZED_end(first_dec, first_class) =>
+    (case+ second_proof of
+     | SYMS_SIZED_end(second_dec, second_class) =>
+       (let prval () = decsym_functional(litlen_fit, first_dec, second_dec) in $A.CELLS_EQ_refl() end)
+     | SYMS_SIZED_literal(second_dec, second_class, _, _) =>
+       (let
+          prval () = decsym_functional(litlen_fit, first_dec, second_dec)
+          prval () = _class_end_value(first_class)
+          prval () = _class_literal_value(second_class)
+        in $A.CELLS_EQ_refl() end)
+     | SYMS_SIZED_copy(second_dec, second_class, _, _, _, _, _, _, _) =>
+       (let
+          prval () = decsym_functional(litlen_fit, first_dec, second_dec)
+          prval () = _class_end_value(first_class)
+          prval () = _class_length_value(second_class)
+        in $A.CELLS_EQ_refl() end))
+  | SYMS_SIZED_literal(first_dec, first_class, first_append, first_rest) =>
+    (case+ second_proof of
+     | SYMS_SIZED_end(second_dec, second_class) =>
+       (let
+          prval () = decsym_functional(litlen_fit, first_dec, second_dec)
+          prval () = _class_literal_value(first_class)
+          prval () = _class_end_value(second_class)
+        in $A.CELLS_EQ_refl() end)
+     | SYMS_SIZED_literal(second_dec, second_class, second_append, second_rest) =>
+       (let
+          prval () = decsym_functional(litlen_fit, first_dec, second_dec)
+        in
+          (case+ $A.append_functional(first_append, second_append) of
+           | $A.CELLS_EQ_refl() => _syms_sized_functional(litlen_fit, dist_fit, first_rest, second_rest))
+        end)
+     | SYMS_SIZED_copy(second_dec, second_class, _, _, _, _, _, _, _) =>
+       (let
+          prval () = decsym_functional(litlen_fit, first_dec, second_dec)
+          prval () = _class_literal_value(first_class)
+          prval () = _class_length_value(second_class)
+        in $A.CELLS_EQ_refl() end))
+  | SYMS_SIZED_copy(first_dec, first_class, first_length_symbol, first_length_bits, first_dist_dec, first_dist_symbol, first_dist_bits, first_copy, first_rest) =>
+    (case+ second_proof of
+     | SYMS_SIZED_end(second_dec, second_class) =>
+       (let
+          prval () = decsym_functional(litlen_fit, first_dec, second_dec)
+          prval () = _class_length_value(first_class)
+          prval () = _class_end_value(second_class)
+        in $A.CELLS_EQ_refl() end)
+     | SYMS_SIZED_literal(second_dec, second_class, _, _) =>
+       (let
+          prval () = decsym_functional(litlen_fit, first_dec, second_dec)
+          prval () = _class_length_value(first_class)
+          prval () = _class_literal_value(second_class)
+        in $A.CELLS_EQ_refl() end)
+     | SYMS_SIZED_copy(second_dec, second_class, second_length_symbol, second_length_bits, second_dist_dec, second_dist_symbol, second_dist_bits, second_copy, second_rest) =>
+       (let
+          prval () = decsym_functional(litlen_fit, first_dec, second_dec)
+          prval () = _length_symbol_functional(first_length_symbol, second_length_symbol)
+          prval () = bits_functional(first_length_bits, second_length_bits)
+          prval () = decsym_functional(dist_fit, first_dist_dec, second_dist_dec)
+          prval () = _distance_symbol_functional(first_dist_symbol, second_dist_symbol)
+          prval () = bits_functional(first_dist_bits, second_dist_bits)
+        in
+          (case+ _copy_functional(first_copy, second_copy) of
+           | $A.CELLS_EQ_refl() => _syms_sized_functional(litlen_fit, dist_fit, first_rest, second_rest))
+        end))
+
+primplement syms_functional {litlen,dist,source}{p}{output,first,second}{first_end,second_end} (litlen_fit, dist_fit, first_proof, second_proof) =
+  (case+ first_proof of
+   | SYMS_made(first_sized) => (case+ second_proof of SYMS_made(second_sized) => _syms_sized_functional(litlen_fit, dist_fit, first_sized, second_sized)))
+
+primplement SYMS_end {litlen,dist,source}{p,sym,used}{output} (decoded, class) = SYMS_made(SYMS_SIZED_end(decoded, class))
+
+primplement SYMS_literal {litlen,dist,source}{p,sym,used,end_bit}{output,next,after} (decoded, class, appended, rest) =
+  (case+ rest of SYMS_made(rest_sized) => SYMS_made(SYMS_SIZED_literal(decoded, class, appended, rest_sized)))
+
+primplement SYMS_copy {litlen,dist,source}{p,sym,used,length_extra_bits,length_base,length_extra_value,dist_sym,dist_used,dist_extra_bits,dist_base,dist_extra_value,end_bit}{output,next,after}
+  (decoded, class, length_symbol, length_bits, dist_decoded, dist_symbol, dist_bits, copied, rest) =
+  (case+ rest of SYMS_made(rest_sized) => SYMS_made(SYMS_SIZED_copy(decoded, class, length_symbol, length_bits, dist_decoded, dist_symbol, dist_bits, copied, rest_sized)))
+
+prfun _run_functional {count:nat}{value:int}{rest,first,second:$A.cells} .<count>.
+  (first_run: RUN(count, value, rest, first), second_run: RUN(count, value, rest, second)): $A.CELLS_EQ(first, second) =
+  case+ first_run of
+  | RUN_zero() => (case+ second_run of RUN_zero() => $A.CELLS_EQ_refl())
+  | RUN_cons(first_rest) => (case+ second_run of RUN_cons(second_rest) => (case+ _run_functional(first_rest, second_rest) of $A.CELLS_EQ_refl() => $A.CELLS_EQ_refl()))
+
+prfn _fixed_litlen_functional {first,second:$A.cells} (first_fixed: FIXED_LITLEN(first), second_fixed: FIXED_LITLEN(second)): $A.CELLS_EQ(first, second) =
+  case+ first_fixed of
+  | FIXED_LITLEN_mk(first_144, first_112, first_24, first_8) =>
+    (case+ second_fixed of
+     | FIXED_LITLEN_mk(second_144, second_112, second_24, second_8) =>
+       (case+ _run_functional(first_8, second_8) of
+        | $A.CELLS_EQ_refl() =>
+          (case+ _run_functional(first_24, second_24) of
+           | $A.CELLS_EQ_refl() =>
+             (case+ _run_functional(first_112, second_112) of
+              | $A.CELLS_EQ_refl() => _run_functional(first_144, second_144)))))
+
+prfn _fixed_dist_functional {first,second:$A.cells} (first_fixed: FIXED_DIST(first), second_fixed: FIXED_DIST(second)): $A.CELLS_EQ(first, second) =
+  case+ first_fixed of
+  | FIXED_DIST_mk(first_run) => (case+ second_fixed of FIXED_DIST_mk(second_run) => _run_functional(first_run, second_run))
+
 prfun _block_functional {kind:block_kind}{source:$A.cells}{p:nat}{before,first,second:$A.cells}{first_end,second_end:nat} .<>.
   (first_block: BLOCK(kind, source, p, before, first, first_end), second_block: BLOCK(kind, source, p, before, second, second_end))
   : [first_end == second_end] $A.CELLS_EQ(first, second) =
@@ -951,6 +1223,13 @@ prfun _block_functional {kind:block_kind}{source:$A.cells}{p:nat}{before,first,s
          (case+ slice_functional(first_slice, second_slice) of
           | $A.CELLS_EQ_refl() => $A.append_functional(first_append, second_append))
        end)
+  | BLOCK_fixed(first_litlen, first_dist, first_litlen_fit, first_dist_fit, first_syms) =>
+    (case+ second_block of
+     | BLOCK_fixed(second_litlen, second_dist, second_litlen_fit, second_dist_fit, second_syms) =>
+       (case+ _fixed_litlen_functional(first_litlen, second_litlen) of
+        | $A.CELLS_EQ_refl() =>
+          (case+ _fixed_dist_functional(first_dist, second_dist) of
+           | $A.CELLS_EQ_refl() => syms_functional(first_litlen_fit, first_dist_fit, first_syms, second_syms))))
 
 primplement block_functional {kind}{source}{p}{before,first,second}{first_end,second_end} (first_block, second_block) = _block_functional(first_block, second_block)
 

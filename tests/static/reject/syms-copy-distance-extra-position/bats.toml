@@ -1,0 +1,9 @@
+[package]
+name = "syms_copy_distance_extra_position"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

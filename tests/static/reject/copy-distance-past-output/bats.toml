@@ -1,0 +1,9 @@
+[package]
+name = "copy_distance_past_output"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

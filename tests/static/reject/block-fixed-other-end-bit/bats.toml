@@ -1,0 +1,9 @@
+[package]
+name = "block_fixed_other_end_bit"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

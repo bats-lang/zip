@@ -1,0 +1,9 @@
+[package]
+name = "copy_functional_other_distance"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

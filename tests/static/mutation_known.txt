@@ -3,3 +3,4 @@
 # variable) are both rejected, so no mutant of this package is accepted. A lemma whose conclusion is
 # `[false] void` would be listed here with a reject fixture beside it.
 src/lib.bats | _decsym_prefix | probe 1==2 | private lemma that concludes [false] void (a shorter code is a prefix of a longer one): a false conclusion has no false variant, and 1 == 2 is equivalent to it. decsym_functional's primplement calls it for decodings of unequal lengths and is itself checked (its control and its guard== mutants); no reject fixture reaches the private lemma, whose one claim is that its case cannot occur.
+src/lib.bats | SYMS_end | arg2:fresh | equivalent mutant: the distance code of SYMS_end is free (the end-of-block symbol reads no distance), so replacing it by another variable of its sort restates the same lemma; the other mutants of SYMS_end (the output, the end bit, the literal/length code) are rejected.

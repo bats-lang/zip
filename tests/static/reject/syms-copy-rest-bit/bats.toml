@@ -1,0 +1,9 @@
+[package]
+name = "syms_copy_rest_bit"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

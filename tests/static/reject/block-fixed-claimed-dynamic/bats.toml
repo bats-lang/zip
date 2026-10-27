@@ -1,0 +1,9 @@
+[package]
+name = "block_fixed_claimed_dynamic"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

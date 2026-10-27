@@ -1,0 +1,9 @@
+[package]
+name = "syms_literal_appends_other_byte"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

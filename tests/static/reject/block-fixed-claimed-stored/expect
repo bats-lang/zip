@@ -1,0 +1,9 @@
+function _fact
+line 10
+the dynamic expression cannot be assigned the type [S2Eapp(S2Ecst(BLOCK); S2Eapp(S2Ecst(block_stored); ), S2Evar(source(14193)), S2Evar(p(14198)), S2Evar(before(14196)), S2Evar(after(14197)), S2Evar(end_bit(14199)))].
+mismatch of static terms (equal):
+The actual term is: S2Eapp(S2Ecst(block_fixed); )
+The needed term is: S2Eapp(S2Ecst(block_stored); )
+mismatch of static terms (tyleq):
+The actual term is: S2Eapp(S2Ecst(BLOCK); S2Eapp(S2Ecst(block_fixed); ), S2Evar(source(14193)), S2Evar(p(14198)), S2Evar(before(14196)), S2Evar(after(14197)), S2Evar(end_bit(14199)))
+The needed term is: S2Eapp(S2Ecst(BLOCK); S2Eapp(S2Ecst(block_stored); ), S2Evar(source(14193)), S2Evar(p(14198)), S2Evar(before(14196)), S2Evar(after(14197)), S2Evar(end_bit(14199)))

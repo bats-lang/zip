@@ -1,0 +1,6 @@
+function _fact
+line 10
+the dynamic expression cannot be assigned the type [S2Eapp(S2Ecst(FIXED_DIST); S2EVar(9412))].
+mismatch of static terms (tyleq):
+The actual term is: S2Eapp(S2Ecst(FIXED_LITLEN); S2Evar(dist(14195)))
+The needed term is: S2Eapp(S2Ecst(FIXED_DIST); S2EVar(9412))

@@ -1,0 +1,9 @@
+[package]
+name = "copy-use"
+kind = "lib"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "block_fixed_fit_of_other_lengths"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

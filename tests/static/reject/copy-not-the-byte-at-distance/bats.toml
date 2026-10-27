@@ -1,0 +1,9 @@
+[package]
+name = "copy_not_the_byte_at_distance"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

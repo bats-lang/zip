@@ -1,0 +1,9 @@
+[package]
+name = "syms_functional_other_position"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""
