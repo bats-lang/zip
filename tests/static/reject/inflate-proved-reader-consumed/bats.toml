@@ -1,0 +1,10 @@
+[package]
+name = "inflate_proved_reader_consumed"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"file" = ""
+"result" = ""
+"zip" = ""

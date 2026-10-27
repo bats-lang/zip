@@ -89,6 +89,32 @@ BTYPE 11 has no constructor. Proved here; `accept/blocks-stored-use` builds the
 `INFLATES` of two real streams (one final block "abc"; "ab" then "c") with every bit of
 LEN and NLEN proved from the bytes, and the rejects change one fact each.
 
+## The decoders that return the proof (bats-lang/zip#64; keyword: decoder)
+
+`inflate_stored_proved` and `inflate_proved` read a `content_reader` of the entry's range and write a
+`content_writer` (file#76), and answer `inflated(start, size_in)`: `inflated_done` carries `INFLATES`
+(stored, or Deflate, of the cells the reader consumed and the cells the writer wrote), both lengths,
+`FILE_READ` and `FILE_HOLDS`; `inflated_stopped` carries an `inflate_failure` (`failure_malformed`,
+`failure_read`, `failure_write`, `failure_too_large`) and the fate of each handle (`reader_fate`,
+`writer_fate`); `inflated_decoded_unsaved` is a decoded stream whose file could not be closed. The
+in-memory forms `inflate_stored_cells_proved` and `inflate_cells_proved` take a barr (at most 1 MiB) and
+answer `inflated_cells` (`done`, `empty`, `malformed`, `too_large`). The reader and writer forms are
+native only (`#target native`, they name `$F`); the in-memory forms and everything under them are both
+targets.
+
+One decoding core serves both: the input is a datavtype (a copy of the barr, or the reader with a refill)
+and the output a datavtype (a 1 MiB barr, or a 64 KiB window with the writer and a slide), each indexed
+by what it holds. The proof of a stream is built as the decoder runs: each symbol, copy and block adds
+its relation (`SYMS`, `BLOCK`, `BLOCKS`), and a later read of more input is carried to the longer cells
+by `EXT` (the cells so far are a prefix of the whole), so no link of the chain is rebuilt. A stored
+decoder refuses a stream whose first block is not stored, as the Deflate decoder refuses BTYPE 3, a
+LEN that is not the complement of NLEN and a stream that ends inside a block. The fixed code's lengths
+are built by `fixed_litlen_make` and `fixed_dist_make` (runs, `RUN`) and checked by the same
+`LENGTHS_FIT` test as a dynamic block's, run at the table build (a decision of the code, not a proof of
+the 288 lengths). Rejected and accepted by `tests/static/{accept,reject}/inflate-*`, `inflated-*` and
+`reader-fate-*`; every lemma has false variants (the four accepted mutants are weaker true statements
+or free variables, in `tests/static/mutation_known.txt`).
+
 ## The lemmas are mutation-checked under the infinite-precision solver (bats-lang/quire#594)
 
 The 32-bit solver can make a proof's context contradictory, so a lemma proves

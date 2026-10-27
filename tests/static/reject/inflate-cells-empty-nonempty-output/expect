@@ -1,0 +1,9 @@
+function _made
+line 8
+the dynamic expression cannot be assigned the type [S2Eapp(S2Ecst(INFLATES); S2Eapp(S2Ecst(inflate_deflated); ), S2EVar(18606), S2Eapp(S2Ecst(cnil); ))].
+mismatch of static terms (equal):
+The actual term is: S2Eapp(S2Ecst(ccons); S2Eintinf(1), S2Eapp(S2Ecst(cnil); ))
+The needed term is: S2Eapp(S2Ecst(cnil); )
+mismatch of static terms (tyleq):
+The actual term is: S2Eapp(S2Ecst(INFLATES); S2Eapp(S2Ecst(inflate_deflated); ), S2Evar(compressed(18956)), S2Eapp(S2Ecst(ccons); S2Eintinf(1), S2Eapp(S2Ecst(cnil); )))
+The needed term is: S2Eapp(S2Ecst(INFLATES); S2Eapp(S2Ecst(inflate_deflated); ), S2EVar(18606->S2Evar(compressed(18956))), S2Eapp(S2Ecst(cnil); ))

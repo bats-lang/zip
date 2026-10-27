@@ -437,10 +437,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
    RFC 1951 as relations (quire#608, zip#64): bits, the canonical Huffman code, the alphabets
    ============================================================ *)
 
-(* The rest of the relations (copies, symbols, the code length run, blocks, the window's
-   lemmas, the decoders) need array#82 (APPEND, CELLS_EQ) and file#76 (the reader and the
-   writer): their approved declarations are in design/rfc1951-declarations.txt, added to
-   this file when those are published (zip#64). *)
+(* The relations are followed by the decoders that return them (keyword: decoder, CLAUDE.md). *)
 
 (* Bit reading, RFC 1951 3.1.1. Bits are numbered from 0, the least
    significant bit of cell 0 first: bit p is bit (p mod 8) of cell (p div 8). *)

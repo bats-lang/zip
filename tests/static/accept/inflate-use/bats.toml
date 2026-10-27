@@ -1,0 +1,10 @@
+[package]
+name = "inflate-use"
+kind = "lib"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"file" = ""
+"result" = ""
+"zip" = ""

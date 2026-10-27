@@ -1,0 +1,10 @@
+[package]
+name = "inflate_stored_proved_answer_other_range"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"file" = ""
+"result" = ""
+"zip" = ""

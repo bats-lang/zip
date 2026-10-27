@@ -1,0 +1,10 @@
+[package]
+name = "inflated_done_compressed_length_other"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"file" = ""
+"result" = ""
+"zip" = ""

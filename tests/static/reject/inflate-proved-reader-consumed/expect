@@ -1,0 +1,9 @@
+function _call
+line 11
+the dynamic expression cannot be assigned the type [S2Eapp(S2Ecst(content_reader); S2Eapp(S2Ecst(cnil); ), S2EVar(18606), S2EVar(18607))].
+mismatch of static terms (equal):
+The actual term is: S2Eapp(S2Ecst(ccons); S2Eintinf(1), S2Eapp(S2Ecst(cnil); ))
+The needed term is: S2Eapp(S2Ecst(cnil); )
+mismatch of static terms (tyleq):
+The actual term is: S2Eapp(S2Ecst(content_reader); S2Eapp(S2Ecst(ccons); S2Eintinf(1), S2Eapp(S2Ecst(cnil); )), S2Evar(start(18956)), S2Evar(size_in(18957)))
+The needed term is: S2Eapp(S2Ecst(content_reader); S2Eapp(S2Ecst(cnil); ), S2EVar(18606->S2Evar(start(18956))), S2EVar(18607->S2Evar(size_in(18957))))

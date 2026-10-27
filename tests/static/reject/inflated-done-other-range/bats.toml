@@ -1,0 +1,10 @@
+[package]
+name = "inflated_done_other_range"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"file" = ""
+"result" = ""
+"zip" = ""

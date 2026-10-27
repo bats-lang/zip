@@ -1,0 +1,9 @@
+[package]
+name = "inflate-cells-use"
+kind = "lib"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""
