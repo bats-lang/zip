@@ -2070,17 +2070,14 @@ primplement length_range {sym,extra_bits,base,value}{source}{p} (symbol, bits) =
   | inflate_stored of ()
   | inflate_deflated of ()
 
-(* cells and cells are the same cells: the one constructor is the only way
-   to have it, so a lemma's conclusion that two outputs are the same is
-   this *)
+(* deprecated, kept one published version beside array's CELLS_EQ, removal zip#74 (keyword: cells-eq): cells and cells are the same cells *)
 #pub dataprop CELLS_EQ($A.cells, $A.cells) =
   | {cs:$A.cells} CELLS_EQ_refl(cs, cs)
 
 (* INFLATES(kind, compressed, output): the entry's data, whose cells are
    compressed, inflates to the cells output by the method kind. The stored
    method (APPNOTE 4.4.5, method 0) keeps the bytes as they are. The
-   Deflated method's constructors are added by the pieces of quire#608
-   that follow (RFC 1951) *)
+   Deflated method (RFC 1951) is BLOCKS from bit 0 with no output before *)
 #pub dataprop INFLATES(inflate_kind, $A.cells, $A.cells) =
   | {cs:$A.cells} INFLATES_stored(inflate_stored(), cs, cs)
   (* the Deflate stream (RFC 1951) from bit 0, with no output before it *)

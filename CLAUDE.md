@@ -37,11 +37,15 @@ cells are `compressed` (array's `cells`), inflates by the method `kind`
 the cells `output`. `inflates_functional` is its lemma: the same method and
 compressed cells give the same output cells, concluded as `CELLS_EQ`.
 
-Only the stored method (ZIP method 0, bytes kept as they are) has a
-constructor so far. The Deflated method is RFC 1951 and is added by the
-pieces that follow in quire#608 (zip#64 to #71), constructor by constructor,
-each extending `inflates_functional`. This piece adds new names only: no
-published signature changed. Proved, not tested: the relation is a
+Both methods have a constructor. `INFLATES_stored` (ZIP method 0, bytes kept as they
+are) gives the cells as they are. `INFLATES_deflated` (RFC 1951) holds `BLOCKS` from
+bit 0 with no output before it (next sections), and `inflates_functional` takes the
+stream's one output from `blocks_functional`. Its conclusion is zip's own `CELLS_EQ`,
+the old form (keyword: cells-eq): it stays one published version beside array's
+`CELLS_EQ`, its source comment is the deprecation naming zip#74, which removes it and
+makes `inflates_functional` conclude array's; `accept/inflates-stored-use` calls it
+(`_old_cells_eq`, and `inflates_functional`'s conclusion), so an edit cannot drop it.
+This piece adds new names only: no published signature changed. Proved, not tested: the relation is a
 specification, so there is nothing to run; `tests/static/accept/inflates-stored-use`
 uses it and `tests/static/reject/inflates-*` reject a stored entry inflating
 to other cells or claimed deflated, and the lemma used for other compressed
@@ -65,27 +69,36 @@ two symbols of one length differ in rank (`_count_before_strict`). It needs only
 each multiplier, so every index term is linear): distance 1 to 32768, length 3 to 258
 (symbol 284 with 31 reaches 258; `SYMS_copy` refuses it, as the RFC has it).
 Proved here, no `praxi`. Checked by the gmp solver; every lemma, private ones included, has
-mutants rejected (`mutation_check.py`: 73 rejected, `_decsym_prefix` listed in
-`tests/static/mutation_known.txt`), and `tests/static/reject` has a fixture for each
+mutants rejected (`mutation_check.py`, next-to-last section: 277 rejected and 1 accepted
+over the whole file at the window step, 228 rejected and 4 accepted over the decoders'
+lemmas, 54 rejected and 0 accepted over the 18 lemmas of the fixed codes' `LENGTHS_FIT`;
+the accepted ones are listed with their reasons in `tests/static/mutation_known.txt`), and `tests/static/reject` has a fixture for each
 relation's constructors and each lemma (shifted claims, the table's rows, the RFC's
-lengths 1, 2, 2 example in `accept/huffman-code-use`). The relations after these (blocks, the
-dynamic header, the window, the decoders) are declared in `design/rfc1951-declarations.txt`
-and are added with their proofs in the order of zip#64.
+lengths 1, 2, 2 example in `accept/huffman-code-use`). All the relations of the RFC are
+declared and proved in `src/lib.bats`: the bits and codes above, the code lengths and the dynamic
+header (`CODE_LENGTHS`, `READ_LENGTHS3`, `CODE_LENGTHS_FROM`), `COPY` and the window
+(`window_functional`, `window_append`, `window_copy`), `SYMS`, `SLICE`, `BLOCK`, `BLOCKS` and
+`INFLATES`; the next sections say what each does. `design/rfc1951-declarations.txt` is the design
+record the declarations were written from.
 
 ## Blocks: BLOCK, BLOCKS and INFLATES_deflated (bats-lang/zip#64; keyword: blocks)
 
 `BLOCK(kind, source, p, before, after, end_bit)` is one block of the kind whose body starts
 at bit `p` (after its 3 header bits): `BLOCK_stored` is 3.2.4 (skip to the byte boundary
 `data_byte`, `LEN`, `NLEN` = the complement, `LEN` bytes, a `SLICE` of the source, appended to
-the output so far with array's `APPEND`); the fixed and the dynamic constructors come with
-their steps. `BLOCKS(source, p, before, after)` is the blocks from bit `p` up to the one with
+the output so far with array's `APPEND`); `BLOCK_fixed` (3.2.6) holds `SYMS` over the fixed
+codes (`FIXED_LITLEN`, `FIXED_DIST`, whose `LENGTHS_FIT` is `fixed_litlen_fit` and
+`fixed_dist_fit`); `BLOCK_dynamic` (3.2.7) holds the header (`HLIT`, `HDIST`, `HCLEN`, the
+code length code, `CODE_LENGTHS`) and `SYMS` over the two codes it gives. `BLOCKS(source, p, before, after)` is the blocks from bit `p` up to the one with
 BFINAL 1, made by `BLOCKS_last` and `BLOCKS_next`; it holds a `BLOCKS_SIZED` with the number of
 blocks, as array's `APPEND` holds an `APPEND_SIZED`, because a proof by recursion needs an
 integer for its termination metric and a relation with no index gives none.
 `INFLATES_deflated` is `BLOCKS` from bit 0 with no output before. `blocks_functional` (a
 stream has one output), `block_functional` and `slice_functional` conclude array's
 `CELLS_EQ`; `inflates_functional` still concludes zip's `CELLS_EQ` (removed by zip#74).
-BTYPE 11 has no constructor. Proved here; `accept/blocks-stored-use` builds the
+BTYPE 11 has no constructor. Proved here (`block_functional` and `blocks_functional` use
+`syms_functional`, `code_lengths_functional` and `copy_functional` for the fixed and the
+dynamic constructors); `accept/blocks-stored-use` builds the
 `INFLATES` of two real streams (one final block "abc"; "ab" then "c") with every bit of
 LEN and NLEN proved from the bytes, and the rejects change one fact each.
 
@@ -145,14 +158,23 @@ compressed chapter into the room `bats_inflate_prepare` gives and times only `ba
 one warm-up and five runs, the median reported, the output's size and sha256 checked against zlib's. The chapter is exactly
 1048576 bytes of output (the XHTML of the three EPUBs' chapters, repeated and cut), deflated by zlib at level 6 to 336388
 bytes (`generate.py` makes it). Measured on 2026-10-27 (Node v22.22.0, Intel Xeon 2.10 GHz, Linux 6.18, a shared machine):
-five runs 166.1, 170.8, 176.5, 194.8 and 188.0 ms, **median 176.5 ms**. The module imports nothing (no symbol of file).
+five runs 166.1, 170.8, 176.5, 194.8 and 188.0 ms, **median 176.5 ms**. The module imports nothing (no symbol of file). Node is v22.22.0, the one on the machine: zip has no
+`.nvmrc`, because its CI runs no Node (`tests/wasm/inflate-speed` is run by hand, and no workflow of this repository runs it or any Node), so no pin is
+there to follow; the harness uses only `WebAssembly`, `performance.now()`, `node:fs` and `node:os`.
 
 ## The lemmas are mutation-checked under the infinite-precision solver (bats-lang/quire#594)
 
 The 32-bit solver can make a proof's context contradictory, so a lemma proves
-nothing while every other check is green. Every lemma of `src/lib.bats` (today
-`inflates_functional`; `CELLS_EQ` and `INFLATES` are dataprops, `prval ... fold@`
-is not a lemma) is checked with false variants of its statement, which the
+nothing while every other check is green. Every lemma of `src/lib.bats` (at this head, the public ones: `bit_functional`,
+`bits_functional`, `hbits_functional`, `bl_count_functional`, `next_code_functional`,
+`code_functional`, `decsym_functional`, `distance_range`, `length_range`,
+`fixed_litlen_fit`, `fixed_dist_fit`, `code_lengths_functional`, `read_lengths3_functional`,
+`code_lengths_from_functional`, `copy_functional`, `syms_functional`, `slice_functional`,
+`block_functional`, `blocks_functional`, `window_functional`, `window_append`, `window_copy`,
+`bits_in_prefix`, `hbits_in_prefix`, `buffer_nth`, `inflates_functional`, the lemma
+constructors `CODE_LENGTHS_*`, `SYMS_*` and `BLOCKS_*`, and the private `prfun`/`prfn` under
+them; `CELLS_EQ`, `INFLATES` and the other relations are dataprops, `prval ... fold@` is not a
+lemma) is checked with false variants of its statement, which the
 compiler must reject: quire's `tests/static/mutation_check.py`, from a clone of
 bats-lang/quire, with the GMP build of ATS2 as `--ats-home` (CI's solver: the
 bats setup action runs `bats ats2 install`). Every control is accepted and every
@@ -160,8 +182,11 @@ mutant rejected. An accepted mutant is a vacuous lemma (file it as a p1) or an
 equivalent mutant listed with its reason in `tests/static/mutation_known.txt`;
 a lemma concluding `[false] void` has no false variant and gets a reject fixture
 in `tests/static/reject` instead (run by `tests/static/run.sh` in CI). A new
-lemma, or a new constructor of `INFLATES` that changes the lemma's body (zip#64
-to #71), is run through the checker again:
+lemma, or a new constructor of `INFLATES` that changes a lemma's body, is run through
+the checker again (the runs at this head: 277 rejected and 1 accepted over the whole file at
+the window step, 228 rejected and 4 accepted over the decoders' lemmas in 24 shards, 54 rejected
+and 0 accepted over the 18 lemmas of the fixed codes in 6 shards, 0 broken and 0 controls failed
+in each):
 
 ```
 BATS_CHECK="bats check --repository REPO" python3 -B -I quire/tests/static/mutation_check.py \
