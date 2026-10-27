@@ -72,6 +72,23 @@ lengths 1, 2, 2 example in `accept/huffman-code-use`). The relations after these
 dynamic header, the window, the decoders) are declared in `design/rfc1951-declarations.txt`
 and are added with their proofs in the order of zip#64.
 
+## Blocks: BLOCK, BLOCKS and INFLATES_deflated (bats-lang/zip#64; keyword: blocks)
+
+`BLOCK(kind, source, p, before, after, end_bit)` is one block of the kind whose body starts
+at bit `p` (after its 3 header bits): `BLOCK_stored` is 3.2.4 (skip to the byte boundary
+`data_byte`, `LEN`, `NLEN` = the complement, `LEN` bytes, a `SLICE` of the source, appended to
+the output so far with array's `APPEND`); the fixed and the dynamic constructors come with
+their steps. `BLOCKS(source, p, before, after)` is the blocks from bit `p` up to the one with
+BFINAL 1, made by `BLOCKS_last` and `BLOCKS_next`; it holds a `BLOCKS_SIZED` with the number of
+blocks, as array's `APPEND` holds an `APPEND_SIZED`, because a proof by recursion needs an
+integer for its termination metric and a relation with no index gives none.
+`INFLATES_deflated` is `BLOCKS` from bit 0 with no output before. `blocks_functional` (a
+stream has one output), `block_functional` and `slice_functional` conclude array's
+`CELLS_EQ`; `inflates_functional` still concludes zip's `CELLS_EQ` (removed by zip#74).
+BTYPE 11 has no constructor. Proved here; `accept/blocks-stored-use` builds the
+`INFLATES` of two real streams (one final block "abc"; "ab" then "c") with every bit of
+LEN and NLEN proved from the bytes, and the rejects change one fact each.
+
 ## The lemmas are mutation-checked under the infinite-precision solver (bats-lang/quire#594)
 
 The 32-bit solver can make a proof's context contradictory, so a lemma proves
