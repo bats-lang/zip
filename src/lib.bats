@@ -872,6 +872,77 @@ primplement decsym_functional {lengths,source}{maxlen,p,first_sym,first_used,sec
   | LENGTH_CLASS_zeros_short(length_zeros_short(), 17)
   | LENGTH_CLASS_zeros_long(length_zeros_long(), 18)
 
+(* CODE_LENGTHS_SIZED(code_length_code, source, p, so_far, total, lengths, end_bit, steps):
+   the code lengths so far, decoded by the code length code from bit p, go on
+   until there are total of them, lengths, ending at bit end_bit, in steps + 1
+   decodes (the count is what a lemma's termination metric reads, as BLOCKS_SIZED);
+   a repeat or run never goes past total, and the repeat of the previous length
+   needs one (3.2.7) *)
+#pub dataprop CODE_LENGTHS_SIZED($A.cells, $A.cells, int, $A.cells, int, $A.cells, int, int) =
+  | {code_length_code,source:$A.cells}{p,total:nat}{so_far:$A.cells} CODE_LENGTHS_SIZED_done(code_length_code, source, p, so_far, total, so_far, p, 0) of $A.CLEN(so_far, total)
+  | {code_length_code,source:$A.cells}{p,total,so_far_count,sym,used,end_bit,steps:nat | so_far_count < total}{so_far,next,lengths:$A.cells}
+    CODE_LENGTHS_SIZED_literal(code_length_code, source, p, so_far, total, lengths, end_bit, steps + 1)
+    of ($A.CLEN(so_far, so_far_count), DECSYM(code_length_code, source, p, sym, used), LENGTH_CLASS(length_literal(), sym),
+        $A.APPEND(so_far, $A.ccons(sym, $A.cnil()), next), CODE_LENGTHS_SIZED(code_length_code, source, p + used, next, total, lengths, end_bit, steps))
+  | {code_length_code,source:$A.cells}{p,total,so_far_count,sym,used,extra_value,end_bit,previous,steps:nat | 1 <= so_far_count; so_far_count + 3 + extra_value <= total}{so_far,run,next,lengths:$A.cells}
+    CODE_LENGTHS_SIZED_repeat_previous(code_length_code, source, p, so_far, total, lengths, end_bit, steps + 1)
+    of ($A.CLEN(so_far, so_far_count), DECSYM(code_length_code, source, p, sym, used), LENGTH_CLASS(length_repeat_previous(), sym),
+        BITS(source, p + used, 2, extra_value), $A.NTH(so_far, so_far_count - 1, previous),
+        RUN(3 + extra_value, previous, $A.cnil(), run), $A.APPEND(so_far, run, next), CODE_LENGTHS_SIZED(code_length_code, source, p + used + 2, next, total, lengths, end_bit, steps))
+  | {code_length_code,source:$A.cells}{p,total,so_far_count,sym,used,extra_value,end_bit,steps:nat | so_far_count + 3 + extra_value <= total}{so_far,run,next,lengths:$A.cells}
+    CODE_LENGTHS_SIZED_zeros_short(code_length_code, source, p, so_far, total, lengths, end_bit, steps + 1)
+    of ($A.CLEN(so_far, so_far_count), DECSYM(code_length_code, source, p, sym, used), LENGTH_CLASS(length_zeros_short(), sym),
+        BITS(source, p + used, 3, extra_value),
+        RUN(3 + extra_value, 0, $A.cnil(), run), $A.APPEND(so_far, run, next), CODE_LENGTHS_SIZED(code_length_code, source, p + used + 3, next, total, lengths, end_bit, steps))
+  | {code_length_code,source:$A.cells}{p,total,so_far_count,sym,used,extra_value,end_bit,steps:nat | so_far_count + 11 + extra_value <= total}{so_far,run,next,lengths:$A.cells}
+    CODE_LENGTHS_SIZED_zeros_long(code_length_code, source, p, so_far, total, lengths, end_bit, steps + 1)
+    of ($A.CLEN(so_far, so_far_count), DECSYM(code_length_code, source, p, sym, used), LENGTH_CLASS(length_zeros_long(), sym),
+        BITS(source, p + used, 7, extra_value),
+        RUN(11 + extra_value, 0, $A.cnil(), run), $A.APPEND(so_far, run, next), CODE_LENGTHS_SIZED(code_length_code, source, p + used + 7, next, total, lengths, end_bit, steps))
+
+(* CODE_LENGTHS(code_length_code, source, p, so_far, total, lengths, end_bit): as
+   CODE_LENGTHS_SIZED without the count; made by CODE_LENGTHS_done, _literal,
+   _repeat_previous, _zeros_short and _zeros_long below. *)
+#pub dataprop CODE_LENGTHS($A.cells, $A.cells, int, $A.cells, int, $A.cells, int) =
+  | {code_length_code,source:$A.cells}{p,total:nat}{so_far,lengths:$A.cells}{end_bit,steps:nat}
+    CODE_LENGTHS_made(code_length_code, source, p, so_far, total, lengths, end_bit) of CODE_LENGTHS_SIZED(code_length_code, source, p, so_far, total, lengths, end_bit, steps)
+
+#pub prfun CODE_LENGTHS_done {code_length_code,source:$A.cells}{p,total:nat}{so_far:$A.cells}
+  ($A.CLEN(so_far, total)): CODE_LENGTHS(code_length_code, source, p, so_far, total, so_far, p)
+
+#pub prfun CODE_LENGTHS_literal {code_length_code,source:$A.cells}{p,total,so_far_count,sym,used,end_bit:nat | so_far_count < total}{so_far,next,lengths:$A.cells}
+  ($A.CLEN(so_far, so_far_count), DECSYM(code_length_code, source, p, sym, used), LENGTH_CLASS(length_literal(), sym),
+   $A.APPEND(so_far, $A.ccons(sym, $A.cnil()), next), CODE_LENGTHS(code_length_code, source, p + used, next, total, lengths, end_bit))
+  : CODE_LENGTHS(code_length_code, source, p, so_far, total, lengths, end_bit)
+
+#pub prfun CODE_LENGTHS_repeat_previous {code_length_code,source:$A.cells}{p,total,so_far_count,sym,used,extra_value,end_bit,previous:nat | 1 <= so_far_count; so_far_count + 3 + extra_value <= total}{so_far,run,next,lengths:$A.cells}
+  ($A.CLEN(so_far, so_far_count), DECSYM(code_length_code, source, p, sym, used), LENGTH_CLASS(length_repeat_previous(), sym),
+   BITS(source, p + used, 2, extra_value), $A.NTH(so_far, so_far_count - 1, previous),
+   RUN(3 + extra_value, previous, $A.cnil(), run), $A.APPEND(so_far, run, next), CODE_LENGTHS(code_length_code, source, p + used + 2, next, total, lengths, end_bit))
+  : CODE_LENGTHS(code_length_code, source, p, so_far, total, lengths, end_bit)
+
+#pub prfun CODE_LENGTHS_zeros_short {code_length_code,source:$A.cells}{p,total,so_far_count,sym,used,extra_value,end_bit:nat | so_far_count + 3 + extra_value <= total}{so_far,run,next,lengths:$A.cells}
+  ($A.CLEN(so_far, so_far_count), DECSYM(code_length_code, source, p, sym, used), LENGTH_CLASS(length_zeros_short(), sym),
+   BITS(source, p + used, 3, extra_value),
+   RUN(3 + extra_value, 0, $A.cnil(), run), $A.APPEND(so_far, run, next), CODE_LENGTHS(code_length_code, source, p + used + 3, next, total, lengths, end_bit))
+  : CODE_LENGTHS(code_length_code, source, p, so_far, total, lengths, end_bit)
+
+#pub prfun CODE_LENGTHS_zeros_long {code_length_code,source:$A.cells}{p,total,so_far_count,sym,used,extra_value,end_bit:nat | so_far_count + 11 + extra_value <= total}{so_far,run,next,lengths:$A.cells}
+  ($A.CLEN(so_far, so_far_count), DECSYM(code_length_code, source, p, sym, used), LENGTH_CLASS(length_zeros_long(), sym),
+   BITS(source, p + used, 7, extra_value),
+   RUN(11 + extra_value, 0, $A.cnil(), run), $A.APPEND(so_far, run, next), CODE_LENGTHS(code_length_code, source, p + used + 7, next, total, lengths, end_bit))
+  : CODE_LENGTHS(code_length_code, source, p, so_far, total, lengths, end_bit)
+
+#pub prfun code_lengths_functional {code_length_code,source:$A.cells}{p,total:nat}{so_far,first,second:$A.cells}{first_end,second_end:nat}
+  (LENGTHS_FIT(code_length_code, 7), CODE_LENGTHS(code_length_code, source, p, so_far, total, first, first_end), CODE_LENGTHS(code_length_code, source, p, so_far, total, second, second_end))
+  : [first_end == second_end] $A.CELLS_EQ(first, second)
+
+#pub prfun read_lengths3_functional {source:$A.cells}{p,count:nat}{first,second:$A.cells}
+  (READ_LENGTHS3(source, p, count, first), READ_LENGTHS3(source, p, count, second)): $A.CELLS_EQ(first, second)
+
+#pub prfun code_lengths_from_functional {order,values:$A.cells}{count,first_sym:nat | first_sym <= 19}{first,second:$A.cells}
+  (CL_ORDER(order), $A.CLEN(values, count), CODE_LENGTHS_FROM(order, count, values, first_sym, first), CODE_LENGTHS_FROM(order, count, values, first_sym, second)): $A.CELLS_EQ(first, second)
+
 (* Blocks, RFC 1951 3.2.3 *)
 
 #pub datasort block_kind =
@@ -957,6 +1028,14 @@ primplement decsym_functional {lengths,source}{maxlen,p,first_sym,first_used,sec
   | {source,litlen,dist:$A.cells}{p,end_bit:nat}{before,after:$A.cells}
     BLOCK_fixed(block_fixed(), source, p, before, after, end_bit)
     of (FIXED_LITLEN(litlen), FIXED_DIST(dist), LENGTHS_FIT(litlen, 15), LENGTHS_FIT(dist, 15), SYMS(litlen, dist, source, p, before, after, end_bit))
+  | {source,values,order,code_length_code,all_lengths,litlen,dist:$A.cells}{p,hlit,hdist,hclen,data_start,end_bit:nat | hlit <= 29; hdist <= 29}{before,after:$A.cells}
+    BLOCK_dynamic(block_dynamic(), source, p, before, after, end_bit)
+    of (BITS(source, p, 5, hlit), BITS(source, p + 5, 5, hdist), BITS(source, p + 10, 4, hclen),
+        READ_LENGTHS3(source, p + 14, hclen + 4, values), CL_ORDER(order), CODE_LENGTHS_FROM(order, hclen + 4, values, 0, code_length_code),
+        LENGTHS_FIT(code_length_code, 7), LENGTHS_FULL(code_length_code, 7),
+        CODE_LENGTHS(code_length_code, source, p + 14 + 3 * (hclen + 4), $A.cnil(), hlit + 257 + hdist + 1, all_lengths, data_start),
+        $A.CLEN(litlen, hlit + 257), $A.APPEND(litlen, dist, all_lengths), LITLEN_USABLE(litlen), DIST_USABLE(dist),
+        SYMS(litlen, dist, source, data_start, before, after, end_bit))
 
 #pub prfun slice_functional {source:$A.cells}{start,width:nat}{first,second:$A.cells}
   (SLICE(source, start, width, first), SLICE(source, start, width, second)): $A.CELLS_EQ(first, second)
@@ -1211,6 +1290,305 @@ prfn _fixed_dist_functional {first,second:$A.cells} (first_fixed: FIXED_DIST(fir
   case+ first_fixed of
   | FIXED_DIST_mk(first_run) => (case+ second_fixed of FIXED_DIST_mk(second_run) => _run_functional(first_run, second_run))
 
+(* Proofs of the dynamic block's header (keyword: dynamic-header) *)
+
+dataprop _NOT_IN(int, $A.cells) =
+  | {x:int} _NOT_IN_nil(x, $A.cnil())
+  | {x,y:int | x != y}{rest:$A.cells} _NOT_IN_cons(x, $A.ccons(y, rest)) of _NOT_IN(x, rest)
+
+dataprop _DISTINCT($A.cells) =
+  | _DISTINCT_nil($A.cnil())
+  | {x:int}{rest:$A.cells} _DISTINCT_cons($A.ccons(x, rest)) of (_NOT_IN(x, rest), _DISTINCT(rest))
+
+dataprop _BOTH_EQ($A.cells, $A.cells, $A.cells, $A.cells) =
+  | {first,second:$A.cells} _BOTH_EQ_mk(first, first, second, second)
+
+prfun _not_in_nth {x:int}{cells:$A.cells}{k:nat} .<k>.
+  (notin: _NOT_IN(x, cells), found: $A.NTH(cells, k, x)): [false] void =
+  case+ found of
+  | $A.NTH_here() => (case+ notin of _NOT_IN_cons(_) => ())
+  | $A.NTH_there(found_rest) => (case+ notin of _NOT_IN_cons(notin_rest) => _not_in_nth(notin_rest, found_rest))
+
+prfun _distinct_nth {cells:$A.cells}{i,j:nat}{s:int} .<i>.
+  (distinct: _DISTINCT(cells), first: $A.NTH(cells, i, s), second: $A.NTH(cells, j, s)): [i == j] void =
+  case+ first of
+  | $A.NTH_here() =>
+    (case+ second of
+     | $A.NTH_here() => ()
+     | $A.NTH_there(second_rest) =>
+       (case+ distinct of _DISTINCT_cons(notin, _) => (let prval () = _not_in_nth(notin, second_rest) in () end)))
+  | $A.NTH_there(first_rest) =>
+    (case+ second of
+     | $A.NTH_here() =>
+       (case+ distinct of _DISTINCT_cons(notin, _) => (let prval () = _not_in_nth(notin, first_rest) in () end))
+     | $A.NTH_there(second_rest) =>
+       (case+ distinct of _DISTINCT_cons(_, distinct_rest) => _distinct_nth(distinct_rest, first_rest, second_rest)))
+
+prfn _cl_order_distinct {order:$A.cells} (order_proof: CL_ORDER(order)): _DISTINCT(order) =
+  case+ order_proof of
+  | CL_ORDER_mk() => _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_nil())))))))))))))))))), _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_nil()))))))))))))))))), _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_nil())))))))))))))))), _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_nil()))))))))))))))), _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_nil())))))))))))))), _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_nil()))))))))))))), _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_nil())))))))))))), _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_nil()))))))))))), _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_nil())))))))))), _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_nil()))))))))), _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_nil())))))))), _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_nil()))))))), _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_nil())))))), _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_nil()))))), _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_nil())))), _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_nil()))), _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_cons(_NOT_IN_nil())), _DISTINCT_cons(_NOT_IN_cons(_NOT_IN_nil()), _DISTINCT_cons(_NOT_IN_nil(), _DISTINCT_nil())))))))))))))))))))
+
+prfun _prefix_nth {order:$A.cells}{count,pos:nat | pos < count}{sym:int} .<pos>.
+  (notin: NOT_IN_PREFIX(order, count, sym), found: $A.NTH(order, pos, sym)): [false] void =
+  case+ found of
+  | $A.NTH_here() => (case+ notin of NOT_IN_PREFIX_cons(_) => ())
+  | $A.NTH_there(found_rest) => (case+ notin of NOT_IN_PREFIX_cons(notin_rest) => _prefix_nth(notin_rest, found_rest))
+
+prfn _code_length_of_functional {order,values:$A.cells}{sym,count,first_len,second_len:nat}
+  (order_proof: CL_ORDER(order), values_len: $A.CLEN(values, count),
+   first: CODE_LENGTH_OF(order, sym, count, values, first_len), second: CODE_LENGTH_OF(order, sym, count, values, second_len))
+  : [first_len == second_len] void =
+  case+ first of
+  | CODE_LENGTH_OF_stored(first_order_nth, first_values_nth) =>
+    (case+ second of
+     | CODE_LENGTH_OF_stored(second_order_nth, second_values_nth) => let
+         prval () = _distinct_nth(_cl_order_distinct(order_proof), first_order_nth, second_order_nth)
+       in $A.nth_functional(first_values_nth, second_values_nth) end
+     | CODE_LENGTH_OF_absent(second_absent) => let
+         prval () = $A.nth_in_len(first_values_nth, values_len)
+         prval () = _prefix_nth(second_absent, first_order_nth)
+       in () end)
+  | CODE_LENGTH_OF_absent(first_absent) =>
+    (case+ second of
+     | CODE_LENGTH_OF_stored(second_order_nth, second_values_nth) => let
+         prval () = $A.nth_in_len(second_values_nth, values_len)
+         prval () = _prefix_nth(first_absent, second_order_nth)
+       in () end
+     | CODE_LENGTH_OF_absent(_) => ())
+
+prfun _read_lengths3_clen {source:$A.cells}{p,count:nat}{values:$A.cells} .<count>.
+  (read: READ_LENGTHS3(source, p, count, values)): $A.CLEN(values, count) =
+  case+ read of
+  | READ_LENGTHS3_nil() => $A.CLEN_nil()
+  | READ_LENGTHS3_cons(_, read_rest) => $A.CLEN_cons(_read_lengths3_clen(read_rest))
+
+prfun _read_lengths3_functional {source:$A.cells}{p,count:nat}{first,second:$A.cells} .<count>.
+  (first_read: READ_LENGTHS3(source, p, count, first), second_read: READ_LENGTHS3(source, p, count, second)): $A.CELLS_EQ(first, second) =
+  case+ first_read of
+  | READ_LENGTHS3_nil() => (case+ second_read of READ_LENGTHS3_nil() => $A.CELLS_EQ_refl())
+  | READ_LENGTHS3_cons(first_bits, first_rest) =>
+    (case+ second_read of
+     | READ_LENGTHS3_cons(second_bits, second_rest) =>
+       (let
+          prval () = bits_functional(first_bits, second_bits)
+        in
+          (case+ _read_lengths3_functional(first_rest, second_rest) of $A.CELLS_EQ_refl() => $A.CELLS_EQ_refl())
+        end))
+
+primplement read_lengths3_functional {source}{p,count}{first,second} (first_read, second_read) = _read_lengths3_functional(first_read, second_read)
+
+prfun _code_lengths_from_functional {order,values:$A.cells}{count,first_sym:nat | first_sym <= 19}{first,second:$A.cells} .<19 - first_sym>.
+  (order_proof: CL_ORDER(order), values_len: $A.CLEN(values, count),
+   first_from: CODE_LENGTHS_FROM(order, count, values, first_sym, first), second_from: CODE_LENGTHS_FROM(order, count, values, first_sym, second))
+  : $A.CELLS_EQ(first, second) =
+  case+ first_from of
+  | CODE_LENGTHS_FROM_end() => (case+ second_from of CODE_LENGTHS_FROM_end() => $A.CELLS_EQ_refl())
+  | CODE_LENGTHS_FROM_cons(first_of, first_rest) =>
+    (case+ second_from of
+     | CODE_LENGTHS_FROM_cons(second_of, second_rest) =>
+       (let
+          prval () = _code_length_of_functional(order_proof, values_len, first_of, second_of)
+        in
+          (case+ _code_lengths_from_functional(order_proof, values_len, first_rest, second_rest) of $A.CELLS_EQ_refl() => $A.CELLS_EQ_refl())
+        end))
+
+primplement code_lengths_from_functional {order,values}{count,first_sym}{first,second} (order_proof, values_len, first_from, second_from) =
+  _code_lengths_from_functional(order_proof, values_len, first_from, second_from)
+
+prfn _length_class_literal_value {sym:nat} (class: LENGTH_CLASS(length_literal(), sym)): [sym <= 15] void =
+  case+ class of LENGTH_CLASS_literal() => ()
+
+prfn _length_class_previous_value {sym:nat} (class: LENGTH_CLASS(length_repeat_previous(), sym)): [sym == 16] void =
+  case+ class of LENGTH_CLASS_repeat_previous() => ()
+
+prfn _length_class_short_value {sym:nat} (class: LENGTH_CLASS(length_zeros_short(), sym)): [sym == 17] void =
+  case+ class of LENGTH_CLASS_zeros_short() => ()
+
+prfn _length_class_long_value {sym:nat} (class: LENGTH_CLASS(length_zeros_long(), sym)): [sym == 18] void =
+  case+ class of LENGTH_CLASS_zeros_long() => ()
+
+
+prfun _code_lengths_sized_functional {code_length_code,source:$A.cells}{p,total:nat}{so_far,first,second:$A.cells}{first_end,second_end,first_steps,second_steps:nat} .<first_steps>.
+  (fit: LENGTHS_FIT(code_length_code, 7),
+   first_proof: CODE_LENGTHS_SIZED(code_length_code, source, p, so_far, total, first, first_end, first_steps),
+   second_proof: CODE_LENGTHS_SIZED(code_length_code, source, p, so_far, total, second, second_end, second_steps))
+  : [first_end == second_end] $A.CELLS_EQ(first, second) =
+  case+ first_proof of
+  | CODE_LENGTHS_SIZED_done(a_clen) =>
+    (case+ second_proof of
+     | CODE_LENGTHS_SIZED_done(b_clen) => $A.CELLS_EQ_refl()
+     | CODE_LENGTHS_SIZED_literal(b_clen, b_dec, b_class, b_app, b_rest) => (let prval () = _clen_functional(a_clen, b_clen) in $A.CELLS_EQ_refl() end)
+     | CODE_LENGTHS_SIZED_repeat_previous(b_clen, b_dec, b_class, b_bits, b_nth, b_run, b_app, b_rest) => (let prval () = _clen_functional(a_clen, b_clen) in $A.CELLS_EQ_refl() end)
+     | CODE_LENGTHS_SIZED_zeros_short(b_clen, b_dec, b_class, b_bits, b_run, b_app, b_rest) => (let prval () = _clen_functional(a_clen, b_clen) in $A.CELLS_EQ_refl() end)
+     | CODE_LENGTHS_SIZED_zeros_long(b_clen, b_dec, b_class, b_bits, b_run, b_app, b_rest) => (let prval () = _clen_functional(a_clen, b_clen) in $A.CELLS_EQ_refl() end))
+  | CODE_LENGTHS_SIZED_literal(a_clen, a_dec, a_class, a_app, a_rest) =>
+    (case+ second_proof of
+     | CODE_LENGTHS_SIZED_done(b_clen) => (let prval () = _clen_functional(a_clen, b_clen) in $A.CELLS_EQ_refl() end)
+     | CODE_LENGTHS_SIZED_literal(b_clen, b_dec, b_class, b_app, b_rest) => (let
+          prval () = decsym_functional(fit, a_dec, b_dec)
+          prval () = _clen_functional(a_clen, b_clen)
+        in
+          (case+ $A.append_functional(a_app, b_app) of $A.CELLS_EQ_refl() => _code_lengths_sized_functional(fit, a_rest, b_rest))
+        end)
+     | CODE_LENGTHS_SIZED_repeat_previous(b_clen, b_dec, b_class, b_bits, b_nth, b_run, b_app, b_rest) => (let
+          prval () = decsym_functional(fit, a_dec, b_dec)
+          prval () = _length_class_literal_value(a_class)
+          prval () = _length_class_previous_value(b_class)
+        in $A.CELLS_EQ_refl() end)
+     | CODE_LENGTHS_SIZED_zeros_short(b_clen, b_dec, b_class, b_bits, b_run, b_app, b_rest) => (let
+          prval () = decsym_functional(fit, a_dec, b_dec)
+          prval () = _length_class_literal_value(a_class)
+          prval () = _length_class_short_value(b_class)
+        in $A.CELLS_EQ_refl() end)
+     | CODE_LENGTHS_SIZED_zeros_long(b_clen, b_dec, b_class, b_bits, b_run, b_app, b_rest) => (let
+          prval () = decsym_functional(fit, a_dec, b_dec)
+          prval () = _length_class_literal_value(a_class)
+          prval () = _length_class_long_value(b_class)
+        in $A.CELLS_EQ_refl() end))
+  | CODE_LENGTHS_SIZED_repeat_previous(a_clen, a_dec, a_class, a_bits, a_nth, a_run, a_app, a_rest) =>
+    (case+ second_proof of
+     | CODE_LENGTHS_SIZED_done(b_clen) => (let prval () = _clen_functional(a_clen, b_clen) in $A.CELLS_EQ_refl() end)
+     | CODE_LENGTHS_SIZED_literal(b_clen, b_dec, b_class, b_app, b_rest) => (let
+          prval () = decsym_functional(fit, a_dec, b_dec)
+          prval () = _length_class_previous_value(a_class)
+          prval () = _length_class_literal_value(b_class)
+        in $A.CELLS_EQ_refl() end)
+     | CODE_LENGTHS_SIZED_repeat_previous(b_clen, b_dec, b_class, b_bits, b_nth, b_run, b_app, b_rest) => (let
+          prval () = decsym_functional(fit, a_dec, b_dec)
+          prval () = _clen_functional(a_clen, b_clen)
+          prval () = bits_functional(a_bits, b_bits)
+          prval () = $A.nth_functional(a_nth, b_nth)
+        in
+          (case+ _run_functional(a_run, b_run) of $A.CELLS_EQ_refl() => (case+ $A.append_functional(a_app, b_app) of $A.CELLS_EQ_refl() => _code_lengths_sized_functional(fit, a_rest, b_rest)))
+        end)
+     | CODE_LENGTHS_SIZED_zeros_short(b_clen, b_dec, b_class, b_bits, b_run, b_app, b_rest) => (let
+          prval () = decsym_functional(fit, a_dec, b_dec)
+          prval () = _length_class_previous_value(a_class)
+          prval () = _length_class_short_value(b_class)
+        in $A.CELLS_EQ_refl() end)
+     | CODE_LENGTHS_SIZED_zeros_long(b_clen, b_dec, b_class, b_bits, b_run, b_app, b_rest) => (let
+          prval () = decsym_functional(fit, a_dec, b_dec)
+          prval () = _length_class_previous_value(a_class)
+          prval () = _length_class_long_value(b_class)
+        in $A.CELLS_EQ_refl() end))
+  | CODE_LENGTHS_SIZED_zeros_short(a_clen, a_dec, a_class, a_bits, a_run, a_app, a_rest) =>
+    (case+ second_proof of
+     | CODE_LENGTHS_SIZED_done(b_clen) => (let prval () = _clen_functional(a_clen, b_clen) in $A.CELLS_EQ_refl() end)
+     | CODE_LENGTHS_SIZED_literal(b_clen, b_dec, b_class, b_app, b_rest) => (let
+          prval () = decsym_functional(fit, a_dec, b_dec)
+          prval () = _length_class_short_value(a_class)
+          prval () = _length_class_literal_value(b_class)
+        in $A.CELLS_EQ_refl() end)
+     | CODE_LENGTHS_SIZED_repeat_previous(b_clen, b_dec, b_class, b_bits, b_nth, b_run, b_app, b_rest) => (let
+          prval () = decsym_functional(fit, a_dec, b_dec)
+          prval () = _length_class_short_value(a_class)
+          prval () = _length_class_previous_value(b_class)
+        in $A.CELLS_EQ_refl() end)
+     | CODE_LENGTHS_SIZED_zeros_short(b_clen, b_dec, b_class, b_bits, b_run, b_app, b_rest) => (let
+          prval () = decsym_functional(fit, a_dec, b_dec)
+          prval () = _clen_functional(a_clen, b_clen)
+          prval () = bits_functional(a_bits, b_bits)
+        in
+          (case+ _run_functional(a_run, b_run) of $A.CELLS_EQ_refl() => (case+ $A.append_functional(a_app, b_app) of $A.CELLS_EQ_refl() => _code_lengths_sized_functional(fit, a_rest, b_rest)))
+        end)
+     | CODE_LENGTHS_SIZED_zeros_long(b_clen, b_dec, b_class, b_bits, b_run, b_app, b_rest) => (let
+          prval () = decsym_functional(fit, a_dec, b_dec)
+          prval () = _length_class_short_value(a_class)
+          prval () = _length_class_long_value(b_class)
+        in $A.CELLS_EQ_refl() end))
+  | CODE_LENGTHS_SIZED_zeros_long(a_clen, a_dec, a_class, a_bits, a_run, a_app, a_rest) =>
+    (case+ second_proof of
+     | CODE_LENGTHS_SIZED_done(b_clen) => (let prval () = _clen_functional(a_clen, b_clen) in $A.CELLS_EQ_refl() end)
+     | CODE_LENGTHS_SIZED_literal(b_clen, b_dec, b_class, b_app, b_rest) => (let
+          prval () = decsym_functional(fit, a_dec, b_dec)
+          prval () = _length_class_long_value(a_class)
+          prval () = _length_class_literal_value(b_class)
+        in $A.CELLS_EQ_refl() end)
+     | CODE_LENGTHS_SIZED_repeat_previous(b_clen, b_dec, b_class, b_bits, b_nth, b_run, b_app, b_rest) => (let
+          prval () = decsym_functional(fit, a_dec, b_dec)
+          prval () = _length_class_long_value(a_class)
+          prval () = _length_class_previous_value(b_class)
+        in $A.CELLS_EQ_refl() end)
+     | CODE_LENGTHS_SIZED_zeros_short(b_clen, b_dec, b_class, b_bits, b_run, b_app, b_rest) => (let
+          prval () = decsym_functional(fit, a_dec, b_dec)
+          prval () = _length_class_long_value(a_class)
+          prval () = _length_class_short_value(b_class)
+        in $A.CELLS_EQ_refl() end)
+     | CODE_LENGTHS_SIZED_zeros_long(b_clen, b_dec, b_class, b_bits, b_run, b_app, b_rest) => (let
+          prval () = decsym_functional(fit, a_dec, b_dec)
+          prval () = _clen_functional(a_clen, b_clen)
+          prval () = bits_functional(a_bits, b_bits)
+        in
+          (case+ _run_functional(a_run, b_run) of $A.CELLS_EQ_refl() => (case+ $A.append_functional(a_app, b_app) of $A.CELLS_EQ_refl() => _code_lengths_sized_functional(fit, a_rest, b_rest)))
+        end))
+
+primplement code_lengths_functional {code_length_code,source}{p,total}{so_far,first,second}{first_end,second_end} (fit, first_proof, second_proof) =
+  (case+ first_proof of
+   | CODE_LENGTHS_made(first_sized) => (case+ second_proof of CODE_LENGTHS_made(second_sized) => _code_lengths_sized_functional(fit, first_sized, second_sized)))
+
+primplement CODE_LENGTHS_done {code_length_code,source}{p,total}{so_far} (so_far_len) = CODE_LENGTHS_made(CODE_LENGTHS_SIZED_done(so_far_len))
+
+primplement CODE_LENGTHS_literal (so_far_len, decoded, class, appended, rest) =
+  (case+ rest of CODE_LENGTHS_made(rest_sized) => CODE_LENGTHS_made(CODE_LENGTHS_SIZED_literal(so_far_len, decoded, class, appended, rest_sized)))
+
+primplement CODE_LENGTHS_repeat_previous (so_far_len, decoded, class, extra, previous, run, appended, rest) =
+  (case+ rest of CODE_LENGTHS_made(rest_sized) => CODE_LENGTHS_made(CODE_LENGTHS_SIZED_repeat_previous(so_far_len, decoded, class, extra, previous, run, appended, rest_sized)))
+
+primplement CODE_LENGTHS_zeros_short (so_far_len, decoded, class, extra, run, appended, rest) =
+  (case+ rest of CODE_LENGTHS_made(rest_sized) => CODE_LENGTHS_made(CODE_LENGTHS_SIZED_zeros_short(so_far_len, decoded, class, extra, run, appended, rest_sized)))
+
+primplement CODE_LENGTHS_zeros_long (so_far_len, decoded, class, extra, run, appended, rest) =
+  (case+ rest of CODE_LENGTHS_made(rest_sized) => CODE_LENGTHS_made(CODE_LENGTHS_SIZED_zeros_long(so_far_len, decoded, class, extra, run, appended, rest_sized)))
+
+prfun _append_sized_len {first,second,both:$A.cells}{n:nat} .<n>.
+  (appended: $A.APPEND_SIZED(first, second, both, n)): $A.CLEN(first, n) =
+  case+ appended of
+  | $A.APPEND_SIZED_nil() => $A.CLEN_nil()
+  | $A.APPEND_SIZED_cons(appended_rest) => $A.CLEN_cons(_append_sized_len(appended_rest))
+
+prfun _append_sized_first {first_a,first_b,second_a,second_b,both:$A.cells}{n:nat} .<n>.
+  (first: $A.APPEND_SIZED(first_a, first_b, both, n), second: $A.APPEND_SIZED(second_a, second_b, both, n)): $A.CELLS_EQ(first_a, second_a) =
+  case+ first of
+  | $A.APPEND_SIZED_nil() => (case+ second of $A.APPEND_SIZED_nil() => $A.CELLS_EQ_refl())
+  | $A.APPEND_SIZED_cons(first_rest) =>
+    (case+ second of
+     | $A.APPEND_SIZED_cons(second_rest) =>
+       (case+ _append_sized_first(first_rest, second_rest) of $A.CELLS_EQ_refl() => $A.CELLS_EQ_refl()))
+
+prfun _append_sized_second {a,first_b,second_b,both:$A.cells}{n,m:nat} .<n>.
+  (first: $A.APPEND_SIZED(a, first_b, both, n), second: $A.APPEND_SIZED(a, second_b, both, m)): $A.CELLS_EQ(first_b, second_b) =
+  case+ first of
+  | $A.APPEND_SIZED_nil() => (case+ second of $A.APPEND_SIZED_nil() => $A.CELLS_EQ_refl())
+  | $A.APPEND_SIZED_cons(first_rest) =>
+    (case+ second of
+     | $A.APPEND_SIZED_cons(second_rest) => _append_sized_second(first_rest, second_rest))
+
+prfn _split_functional {first_a,first_b,second_a,second_b,both:$A.cells}{n:nat}
+  (first_len: $A.CLEN(first_a, n), second_len: $A.CLEN(second_a, n), first: $A.APPEND(first_a, first_b, both), second: $A.APPEND(second_a, second_b, both))
+  : _BOTH_EQ(first_a, second_a, first_b, second_b) =
+  case+ first of
+  | $A.APPEND_made(first_sized) =>
+    (case+ second of
+     | $A.APPEND_made(second_sized) =>
+       (let
+          prval () = _clen_functional(first_len, _append_sized_len(first_sized))
+          prval () = _clen_functional(second_len, _append_sized_len(second_sized))
+        in
+          (case+ _append_sized_first(first_sized, second_sized) of
+           | $A.CELLS_EQ_refl() => (case+ _append_sized_second(first_sized, second_sized) of $A.CELLS_EQ_refl() => _BOTH_EQ_mk()))
+        end))
+
+prfn _litlen_fit {lengths:$A.cells} (usable: LITLEN_USABLE(lengths)): LENGTHS_FIT(lengths, 15) =
+  case+ usable of
+  | LITLEN_USABLE_full(fit, _) => fit
+  | LITLEN_USABLE_single(fit, _) => fit
+
+prfn _dist_fit {lengths:$A.cells} (usable: DIST_USABLE(lengths)): LENGTHS_FIT(lengths, 15) =
+  case+ usable of
+  | DIST_USABLE_full(fit, _) => fit
+  | DIST_USABLE_single(fit, _) => fit
+  | DIST_USABLE_empty(fit, _) => fit
+
 prfun _block_functional {kind:block_kind}{source:$A.cells}{p:nat}{before,first,second:$A.cells}{first_end,second_end:nat} .<>.
   (first_block: BLOCK(kind, source, p, before, first, first_end), second_block: BLOCK(kind, source, p, before, second, second_end))
   : [first_end == second_end] $A.CELLS_EQ(first, second) =
@@ -1230,6 +1608,28 @@ prfun _block_functional {kind:block_kind}{source:$A.cells}{p:nat}{before,first,s
         | $A.CELLS_EQ_refl() =>
           (case+ _fixed_dist_functional(first_dist, second_dist) of
            | $A.CELLS_EQ_refl() => syms_functional(first_litlen_fit, first_dist_fit, first_syms, second_syms))))
+  | BLOCK_dynamic(first_hlit, first_hdist, first_hclen, first_values, first_order, first_from, first_fit, first_full, first_lengths, first_litlen_len, first_append, first_litlen_usable, first_dist_usable, first_syms) =>
+    (case+ second_block of
+     | BLOCK_dynamic(second_hlit, second_hdist, second_hclen, second_values, second_order, second_from, second_fit, second_full, second_lengths, second_litlen_len, second_append, second_litlen_usable, second_dist_usable, second_syms) =>
+       (let
+          prval () = bits_functional(first_hlit, second_hlit)
+          prval () = bits_functional(first_hdist, second_hdist)
+          prval () = bits_functional(first_hclen, second_hclen)
+          prval first_values_len = _read_lengths3_clen(first_values)
+        in
+          (case+ _read_lengths3_functional(first_values, second_values) of
+           | $A.CELLS_EQ_refl() =>
+             (case+ first_order of
+              | CL_ORDER_mk() =>
+                (case+ second_order of
+                 | CL_ORDER_mk() =>
+                   (case+ _code_lengths_from_functional(first_order, first_values_len, first_from, second_from) of
+                    | $A.CELLS_EQ_refl() =>
+                      (case+ code_lengths_functional(first_fit, first_lengths, second_lengths) of
+                       | $A.CELLS_EQ_refl() =>
+                         (case+ _split_functional(first_litlen_len, second_litlen_len, first_append, second_append) of
+                          | _BOTH_EQ_mk() => syms_functional(_litlen_fit(first_litlen_usable), _dist_fit(first_dist_usable), first_syms, second_syms)))))))
+        end))
 
 primplement block_functional {kind}{source}{p}{before,first,second}{first_end,second_end} (first_block, second_block) = _block_functional(first_block, second_block)
 

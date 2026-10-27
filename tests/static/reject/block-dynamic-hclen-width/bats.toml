@@ -1,0 +1,9 @@
+[package]
+name = "block_dynamic_hclen_width"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

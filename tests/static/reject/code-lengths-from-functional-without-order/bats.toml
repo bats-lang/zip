@@ -1,0 +1,9 @@
+[package]
+name = "code_lengths_from_functional_without_order"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

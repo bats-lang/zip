@@ -1,0 +1,9 @@
+[package]
+name = "length_class_literal_sixteen"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "block_dynamic_read_position"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

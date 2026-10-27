@@ -1,0 +1,9 @@
+[package]
+name = "code_lengths_literal_rest_bit"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

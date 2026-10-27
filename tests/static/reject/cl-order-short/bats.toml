@@ -1,0 +1,9 @@
+[package]
+name = "cl_order_short"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

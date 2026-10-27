@@ -1,0 +1,9 @@
+[package]
+name = "code_lengths_from_end_early"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

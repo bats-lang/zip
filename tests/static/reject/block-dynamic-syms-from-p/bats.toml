@@ -1,0 +1,9 @@
+[package]
+name = "block_dynamic_syms_from_p"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

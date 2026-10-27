@@ -1,0 +1,9 @@
+[package]
+name = "block_dynamic_code_fit_fifteen"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

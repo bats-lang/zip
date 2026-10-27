@@ -1,0 +1,9 @@
+[package]
+name = "code-lengths-literal-control"
+kind = "lib"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "block_dynamic_hdist_position"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""
