@@ -1,0 +1,9 @@
+[package]
+name = "window_copy_of_other_output"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "window_after_copy_keep"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1695,6 +1695,285 @@ primplement BLOCKS_next {source}{p,btype,end_bit}{kind}{before,middle,after} (fi
 #pub dataprop WINDOW_IN_BUFFER($A.cells, int, $A.cells) =
   | {buffer,window:$A.cells}{start,count:nat} WINDOW_IN_BUFFER_mk(buffer, start, window) of (SLICE(buffer, start, count, window), $A.CLEN(window, count))
 
+#pub prfun window_functional {output,first,second:$A.cells} (WINDOW(output, first), WINDOW(output, second)): $A.CELLS_EQ(first, second)
+
+(* The window after appending data to the output: the last 32768 of the
+   window and the data, and it is the window of the output after. The
+   premise CLEN(data, count) is added to the approved declaration: taking the last
+   32768 cells of a sequence needs its length, and the decoder has it (a literal
+   is one cell, a copy has length cells) (keyword: window). *)
+#pub dataprop WINDOW_AFTER_APPEND($A.cells, $A.cells, $A.cells) =
+  | {window,data,next,both,next_window:$A.cells}
+    WINDOW_AFTER_APPEND_mk(window, data, next) of ($A.APPEND(window, data, both), TAKE_LAST(both, 32768, next_window), WINDOW(next, next_window))
+
+#pub prfun window_append {output,window,data,next:$A.cells}{count:nat}
+  (WINDOW(output, window), $A.APPEND(output, data, next), $A.CLEN(data, count)): WINDOW_AFTER_APPEND(window, data, next)
+
+(* A copy read from the window is the copy read from the output: the window
+   followed by the copied cells, cut to its last 32768, is the window of the
+   output after the copy *)
+#pub dataprop WINDOW_AFTER_COPY($A.cells, int, int, $A.cells) =
+  | {window,after,both,next_window:$A.cells}{distance,length:nat}
+    WINDOW_AFTER_COPY_mk(window, distance, length, after) of (COPY(window, distance, length, both), TAKE_LAST(both, 32768, next_window), WINDOW(after, next_window))
+
+#pub prfun window_copy {output,window,after:$A.cells}{distance,length:nat | distance <= 32768}
+  (WINDOW(output, window), COPY(output, distance, length, after)): WINDOW_AFTER_COPY(window, distance, length, after)
+
+(* The input in chunks: how a buffer relates to the consumed prefix (zip#64). The
+   compressed bytes are read from a reader in chunks (bats-lang/file#76). Its index is
+   the cells consumed so far, and at the end of the file it closes, as the whole
+   compressed sequence the proof talks about. Bits read from a prefix are bits of the
+   whole sequence: *)
+#pub prfun bits_in_prefix {earlier,rest,whole:$A.cells}{p,width,value:nat}
+  ($A.APPEND(earlier, rest, whole), BITS(earlier, p, width, value)): BITS(whole, p, width, value)
+
+#pub prfun hbits_in_prefix {earlier,rest,whole:$A.cells}{p,width,code:nat}
+  ($A.APPEND(earlier, rest, whole), HBITS(earlier, p, width, code)): HBITS(whole, p, width, code)
+
+(* BUFFER_AT(previous, chunk, consumed, start): the chunk in the decoder's
+   buffer was the last read, consumed is the cells before it and the chunk,
+   and the buffer's cell i is cell start + i of the consumed cells *)
+#pub dataprop BUFFER_AT($A.cells, $A.cells, $A.cells, int) =
+  | {previous,chunk,consumed:$A.cells}{start:nat} BUFFER_AT_mk(previous, chunk, consumed, start) of ($A.CLEN(previous, start), $A.APPEND(previous, chunk, consumed))
+
+#pub prfun buffer_nth {previous,chunk,consumed:$A.cells}{start,index,value:nat}
+  (BUFFER_AT(previous, chunk, consumed, start), $A.NTH(chunk, index, value)): $A.NTH(consumed, start + index, value)
+
+(* RESERVOIR(consumed, p, count, value): the bit reservoir the decoder holds
+   across chunks is the count bits from bit p of the consumed cells *)
+#pub dataprop RESERVOIR($A.cells, int, int, int) =
+  | {consumed:$A.cells}{p,count,value:nat} RESERVOIR_mk(consumed, p, count, value) of BITS(consumed, p, count, value)
+
+(* Proofs of the window and of the chunked input (keyword: window) *)
+
+prfn _take_last_len {output:$A.cells}{keep:nat}{window:$A.cells}
+  (taken: TAKE_LAST(output, keep, window)): [n:nat] $A.CLEN(output, n) =
+  case+ taken of
+  | TAKE_LAST_short(output_len) => output_len
+  | TAKE_LAST_drop(rest_len, _) => $A.CLEN_cons(rest_len)
+
+prfun _take_last_total {cells:$A.cells}{keep,n:nat} .<n>.
+  (cells_len: $A.CLEN(cells, n)): [window:$A.cells] TAKE_LAST(cells, keep, window) =
+  sif n <= keep then TAKE_LAST_short(cells_len)
+  else (case+ cells_len of $A.CLEN_cons(rest_len) => TAKE_LAST_drop(rest_len, _take_last_total(rest_len)))
+
+prfun _take_last_functional {output:$A.cells}{keep,n:nat}{first,second:$A.cells} .<n>.
+  (output_len: $A.CLEN(output, n), first_taken: TAKE_LAST(output, keep, first), second_taken: TAKE_LAST(output, keep, second)): $A.CELLS_EQ(first, second) =
+  case+ first_taken of
+  | TAKE_LAST_short(first_len) =>
+    (case+ second_taken of
+     | TAKE_LAST_short(_) => $A.CELLS_EQ_refl()
+     | TAKE_LAST_drop(second_rest_len, _) =>
+       (let prval () = _clen_functional(first_len, $A.CLEN_cons(second_rest_len)) in $A.CELLS_EQ_refl() end))
+  | TAKE_LAST_drop(first_rest_len, first_rest) =>
+    (case+ second_taken of
+     | TAKE_LAST_short(second_len) =>
+       (let prval () = _clen_functional(second_len, $A.CLEN_cons(first_rest_len)) in $A.CELLS_EQ_refl() end)
+     | TAKE_LAST_drop(_, second_rest) =>
+       (case+ output_len of
+        | $A.CLEN_cons(rest_len) =>
+          (case+ _take_last_functional(rest_len, first_rest, second_rest) of $A.CELLS_EQ_refl() => $A.CELLS_EQ_refl())))
+
+primplement window_functional {output,first,second} (first_window, second_window) =
+  (case+ first_window of
+   | WINDOW_mk(first_taken) =>
+     (case+ second_window of
+      | WINDOW_mk(second_taken) => _take_last_functional(_take_last_len(first_taken), first_taken, second_taken)))
+
+prfun _append_total {first,second:$A.cells}{n:nat} .<n>.
+  (first_len: $A.CLEN(first, n)): [both:$A.cells] $A.APPEND(first, second, both) =
+  case+ first_len of
+  | $A.CLEN_nil() => $A.APPEND_nil()
+  | $A.CLEN_cons(rest_len) => $A.APPEND_cons(_append_total(rest_len))
+
+prfun _append_sized_clen {first,second,both:$A.cells}{n,m:nat} .<n>.
+  (appended: $A.APPEND_SIZED(first, second, both, n), second_len: $A.CLEN(second, m)): $A.CLEN(both, n + m) =
+  case+ appended of
+  | $A.APPEND_SIZED_nil() => second_len
+  | $A.APPEND_SIZED_cons(appended_rest) => $A.CLEN_cons(_append_sized_clen(appended_rest, second_len))
+
+prfn _append_clen {first,second,both:$A.cells}{n,m:nat}
+  (appended: $A.APPEND(first, second, both), first_len: $A.CLEN(first, n), second_len: $A.CLEN(second, m)): $A.CLEN(both, n + m) =
+  case+ appended of
+  | $A.APPEND_made(sized) =>
+    (let
+       prval () = _clen_functional(first_len, _append_sized_len(sized))
+     in _append_sized_clen(sized, second_len) end)
+
+prfun _nth_in_append_left {first,second,both:$A.cells}{i,n:nat}{value:int} .<n>.
+  (appended: $A.APPEND_SIZED(first, second, both, n), found: $A.NTH(first, i, value)): $A.NTH(both, i, value) =
+  case+ found of
+  | $A.NTH_here() => (case+ appended of $A.APPEND_SIZED_cons(_) => $A.NTH_here())
+  | $A.NTH_there(found_rest) => (case+ appended of $A.APPEND_SIZED_cons(appended_rest) => $A.NTH_there(_nth_in_append_left(appended_rest, found_rest)))
+
+prfun _nth_in_append_right {first,second,both:$A.cells}{i,n:nat}{value:int} .<n>.
+  (appended: $A.APPEND_SIZED(first, second, both, n), found: $A.NTH(second, i, value)): $A.NTH(both, n + i, value) =
+  case+ appended of
+  | $A.APPEND_SIZED_nil() => found
+  | $A.APPEND_SIZED_cons(appended_rest) => $A.NTH_there(_nth_in_append_right(appended_rest, found))
+
+primplement buffer_nth {previous,chunk,consumed}{start,index,value} (buffer, found) =
+  (case+ buffer of
+   | BUFFER_AT_mk(previous_len, appended) =>
+     (case+ appended of
+      | $A.APPEND_made(sized) =>
+        (let prval () = _clen_functional(previous_len, _append_sized_len(sized)) in _nth_in_append_right(sized, found) end)))
+
+prfun _bit_in_whole {earlier,rest,whole:$A.cells}{p,n:nat}{bit:nat} .<>.
+  (appended: $A.APPEND_SIZED(earlier, rest, whole, n), found: BIT(earlier, p, bit)): BIT(whole, p, bit) =
+  (case+ found of BIT_mk(found_nth, found_byte_bit) => BIT_mk(_nth_in_append_left(appended, found_nth), found_byte_bit))
+
+prfun _bits_in_whole {earlier,rest,whole:$A.cells}{p,width,value,n:nat} .<width>.
+  (appended: $A.APPEND_SIZED(earlier, rest, whole, n), bits: BITS(earlier, p, width, value)): BITS(whole, p, width, value) =
+  case+ bits of
+  | BITS_nil() => BITS_nil()
+  | BITS_cons(bit, bits_rest) => BITS_cons(_bit_in_whole(appended, bit), _bits_in_whole(appended, bits_rest))
+
+primplement bits_in_prefix {earlier,rest,whole}{p,width,value} (appended, bits) =
+  (case+ appended of $A.APPEND_made(sized) => _bits_in_whole(sized, bits))
+
+prfun _hbits_in_whole {earlier,rest,whole:$A.cells}{p,width,code,n:nat} .<width>.
+  (appended: $A.APPEND_SIZED(earlier, rest, whole, n), bits: HBITS(earlier, p, width, code)): HBITS(whole, p, width, code) =
+  case+ bits of
+  | HBITS_nil() => HBITS_nil()
+  | HBITS_snoc(bits_rest, bit) => HBITS_snoc(_hbits_in_whole(appended, bits_rest), _bit_in_whole(appended, bit))
+
+primplement hbits_in_prefix {earlier,rest,whole}{p,width,code} (appended, bits) =
+  (case+ appended of $A.APPEND_made(sized) => _hbits_in_whole(sized, bits))
+
+dataprop _TAILWIN($A.cells, $A.cells, int) =
+  | {window:$A.cells}{keep,count:nat} _TAILWIN_whole(window, window, keep) of $A.CLEN(window, count)
+  | {pre,window,output:$A.cells}{keep,count:nat | keep <= count} _TAILWIN_cut(output, window, keep) of ($A.APPEND(pre, window, output), $A.CLEN(window, count))
+
+dataprop _TAKE_BOTH($A.cells, $A.cells, int, $A.cells) =
+  | {window,output,nw:$A.cells}{keep:nat} _TAKE_BOTH_mk(window, output, keep, nw) of (TAKE_LAST(window, keep, nw), TAKE_LAST(output, keep, nw))
+
+prfun _append_assoc {a,b,ab,c,abc,bc:$A.cells}{n:nat} .<n>.
+  (first: $A.APPEND_SIZED(a, b, ab, n), second: $A.APPEND(ab, c, abc), third: $A.APPEND(b, c, bc)): $A.APPEND(a, bc, abc) =
+  case+ first of
+  | $A.APPEND_SIZED_nil() => (case+ $A.append_functional(second, third) of $A.CELLS_EQ_refl() => $A.APPEND_nil())
+  | $A.APPEND_SIZED_cons(first_rest) =>
+    (case+ second of
+     | $A.APPEND_made(second_sized) =>
+       (case+ second_sized of
+        | $A.APPEND_SIZED_cons(second_rest) => $A.APPEND_cons(_append_assoc(first_rest, $A.APPEND_made(second_rest), third))))
+
+prfun _tailwin_of_take_last {output,window:$A.cells}{keep,n:nat} .<n>.
+  (output_len: $A.CLEN(output, n), taken: TAKE_LAST(output, keep, window)): _TAILWIN(output, window, keep) =
+  case+ taken of
+  | TAKE_LAST_short(short_len) => _TAILWIN_whole(short_len)
+  | TAKE_LAST_drop(rest_len, rest_taken) =>
+    (case+ output_len of
+     | $A.CLEN_cons(output_rest_len) =>
+       (case+ _tailwin_of_take_last(output_rest_len, rest_taken) of
+        | _TAILWIN_whole(_) => _TAILWIN_cut($A.APPEND_cons($A.APPEND_nil()), rest_len)
+        | _TAILWIN_cut(pre_append, window_len) => _TAILWIN_cut($A.APPEND_cons(pre_append), window_len)))
+
+prfun _take_last_prepend {pre,window,output,nw:$A.cells}{keep,count,m:nat | keep <= count} .<m>.
+  (appended: $A.APPEND_SIZED(pre, window, output, m), window_len: $A.CLEN(window, count), taken: TAKE_LAST(window, keep, nw)): TAKE_LAST(output, keep, nw) =
+  case+ appended of
+  | $A.APPEND_SIZED_nil() => taken
+  | $A.APPEND_SIZED_cons(appended_rest) => TAKE_LAST_drop(_append_sized_clen(appended_rest, window_len), _take_last_prepend(appended_rest, window_len, taken))
+
+prfn _tailwin_take_last {output,window:$A.cells}{keep:nat}
+  (tail: _TAILWIN(output, window, keep)): [nw:$A.cells] _TAKE_BOTH(window, output, keep, nw) =
+  case+ tail of
+  | _TAILWIN_whole(window_len) => (case+ _take_last_total(window_len) of window_taken => _TAKE_BOTH_mk(window_taken, window_taken))
+  | _TAILWIN_cut(pre_append, window_len) =>
+    (case+ pre_append of
+     | $A.APPEND_made(pre_sized) =>
+       (case+ _take_last_total(window_len) of window_taken => _TAKE_BOTH_mk(window_taken, _take_last_prepend(pre_sized, window_len, window_taken))))
+
+prfn _tailwin_window_len {output,window:$A.cells}{keep:nat}
+  (tail: _TAILWIN(output, window, keep)): [w:nat] $A.CLEN(window, w) =
+  case+ tail of
+  | _TAILWIN_whole(window_len) => window_len
+  | _TAILWIN_cut(_, window_len) => window_len
+
+prfn _tailwin_append {output,window,data,next,both:$A.cells}{keep,count:nat}
+  (tail: _TAILWIN(output, window, keep), output_append: $A.APPEND(output, data, next), window_append: $A.APPEND(window, data, both), data_len: $A.CLEN(data, count))
+  : _TAILWIN(next, both, keep) =
+  case+ tail of
+  | _TAILWIN_whole(window_len) =>
+    (case+ $A.append_functional(output_append, window_append) of
+     | $A.CELLS_EQ_refl() => _TAILWIN_whole(_append_clen(window_append, window_len, data_len)))
+  | _TAILWIN_cut(pre_append, window_len) =>
+    (case+ pre_append of
+     | $A.APPEND_made(pre_sized) => _TAILWIN_cut(_append_assoc(pre_sized, output_append, window_append), _append_clen(window_append, window_len, data_len)))
+
+primplement window_append {output,window,data,next}{count} (window_proof, output_append, data_len) =
+  (case+ window_proof of
+   | WINDOW_mk(taken) =>
+     (let
+        prval output_len = _take_last_len(taken)
+        prval tail = _tailwin_of_take_last(output_len, taken)
+        prval window_len = _tailwin_window_len(tail)
+        prval window_append = _append_total(window_len)
+        prval tail_after = _tailwin_append(tail, output_append, window_append, data_len)
+      in
+        (case+ _tailwin_take_last(tail_after) of
+         | _TAKE_BOTH_mk(both_taken, next_taken) => WINDOW_AFTER_APPEND_mk(window_append, both_taken, WINDOW_mk(next_taken)))
+      end))
+
+prfun _nth_in_tail {pre,window,output:$A.cells}{i,m:nat | m <= i}{value:int} .<m>.
+  (appended: $A.APPEND_SIZED(pre, window, output, m), found: $A.NTH(output, i, value)): $A.NTH(window, i - m, value) =
+  case+ appended of
+  | $A.APPEND_SIZED_nil() => found
+  | $A.APPEND_SIZED_cons(appended_rest) =>
+    (case+ found of $A.NTH_there(found_rest) => _nth_in_tail(appended_rest, found_rest))
+
+prfn _window_nth {output,window:$A.cells}{keep,n,distance:nat | 1 <= distance; distance <= n; distance <= keep}{w:nat}{value:int}
+  (tail: _TAILWIN(output, window, keep), output_len: $A.CLEN(output, n), window_len: $A.CLEN(window, w), found: $A.NTH(output, n - distance, value))
+  : [distance <= w] $A.NTH(window, w - distance, value) =
+  case+ tail of
+  | _TAILWIN_whole(whole_len) =>
+    (let
+       prval () = _clen_functional(whole_len, window_len)
+       prval () = _clen_functional(output_len, window_len)
+     in found end)
+  | _TAILWIN_cut(pre_append, cut_len) =>
+    (case+ pre_append of
+     | $A.APPEND_made(pre_sized) =>
+       (let
+          prval () = _clen_functional(cut_len, window_len)
+          prval () = _clen_functional(output_len, _append_sized_clen(pre_sized, window_len))
+        in _nth_in_tail(pre_sized, found) end))
+
+dataprop _COPY_IN($A.cells, int, int, $A.cells, int) =
+  | {window,after,both:$A.cells}{distance,length,keep:nat} _COPY_IN_mk(window, distance, length, after, keep) of (COPY(window, distance, length, both), _TAILWIN(after, both, keep))
+
+prfun _copy_in_window {output,window,after:$A.cells}{keep,distance,length,n:nat | distance <= keep} .<length>.
+  (tail: _TAILWIN(output, window, keep), output_len: $A.CLEN(output, n), copied: COPY(output, distance, length, after))
+  : _COPY_IN(window, distance, length, after, keep) =
+  case+ copied of
+  | COPY_done() => _COPY_IN_mk(COPY_done(), tail)
+  | COPY_step(step_len, step_nth, step_append, step_rest) =>
+    (let
+       prval () = _clen_functional(step_len, output_len)
+       prval window_len = _tailwin_window_len(tail)
+       prval window_nth = _window_nth{output,window}{keep,n,distance}(tail, output_len, window_len, step_nth)
+       prval window_append = _append_total(window_len)
+       prval one_len = $A.CLEN_cons($A.CLEN_nil())
+       prval tail_after = _tailwin_append(tail, step_append, window_append, one_len)
+       prval next_len = _append_clen(step_append, output_len, one_len)
+     in
+       (case+ _copy_in_window(tail_after, next_len, step_rest) of
+        | _COPY_IN_mk(rest_copy, rest_tail) => _COPY_IN_mk(COPY_step(window_len, window_nth, window_append, rest_copy), rest_tail))
+     end)
+
+primplement window_copy {output,window,after}{distance,length} (window_proof, copied) =
+  (case+ window_proof of
+   | WINDOW_mk(taken) =>
+     (let
+        prval output_len = _take_last_len(taken)
+        prval tail = _tailwin_of_take_last(output_len, taken)
+      in
+        (case+ _copy_in_window(tail, output_len, copied) of
+         | _COPY_IN_mk(window_copied, tail_after) =>
+           (case+ _tailwin_take_last(tail_after) of
+            | _TAKE_BOTH_mk(both_taken, after_taken) => WINDOW_AFTER_COPY_mk(window_copied, both_taken, WINDOW_mk(after_taken))))
+      end))
+
 (* Ranges (the Done-when): a copy's distance is 1 to 32768 and its length
    3 to 258 *)
 #pub prfun distance_range {sym,extra_bits,base,value:nat}{source:$A.cells}{p:nat}

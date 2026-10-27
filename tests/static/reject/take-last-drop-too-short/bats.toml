@@ -1,0 +1,9 @@
+[package]
+name = "take_last_drop_too_short"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

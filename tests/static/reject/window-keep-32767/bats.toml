@@ -1,0 +1,9 @@
+[package]
+name = "window_keep_32767"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

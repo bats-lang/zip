@@ -1,0 +1,9 @@
+[package]
+name = "window_append_other_data"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

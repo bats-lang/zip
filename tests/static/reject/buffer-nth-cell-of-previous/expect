@@ -1,0 +1,3 @@
+function _of_previous
+line 9
+unsolved constraint: C3NSTRprop(C3TKmain(); S2Eeqeq(S2Evar(previous(15678)); S2Evar(chunk(15679))))

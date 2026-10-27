@@ -1,0 +1,9 @@
+[package]
+name = "buffer_nth_cell_of_previous"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

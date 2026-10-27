@@ -1,0 +1,3 @@
+function _position
+line 8
+unsolved constraint: C3NSTRprop(C3TKmain(); S2Eeqeq(S2Evar(p(15679)); S2Eapp(S2Ecst(add_int_int); S2Evar(p(15679)), S2Eintinf(1))))

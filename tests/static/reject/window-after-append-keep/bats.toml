@@ -1,0 +1,9 @@
+[package]
+name = "window_after_append_keep"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

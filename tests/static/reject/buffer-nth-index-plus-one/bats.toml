@@ -1,0 +1,9 @@
+[package]
+name = "buffer_nth_index_plus_one"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

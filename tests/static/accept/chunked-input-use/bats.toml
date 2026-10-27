@@ -1,0 +1,9 @@
+[package]
+name = "chunked-input-use"
+kind = "lib"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

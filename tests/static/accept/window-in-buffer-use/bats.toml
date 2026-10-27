@@ -1,0 +1,9 @@
+[package]
+name = "window-in-buffer-use"
+kind = "lib"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

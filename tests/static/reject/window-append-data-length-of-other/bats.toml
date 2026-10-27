@@ -1,0 +1,9 @@
+[package]
+name = "window_append_data_length_of_other"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

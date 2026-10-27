@@ -1,0 +1,9 @@
+[package]
+name = "buffer_at_start_not_length"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""
