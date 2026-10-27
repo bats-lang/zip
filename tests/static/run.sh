@@ -1,8 +1,11 @@
 #!/bin/sh
-# Static tests of zip's types. Each package under
-# tests/static/accept/ must pass `bats check`; each under
-# tests/static/reject/ must fail it with the message in its `expect`
-# file (so it is rejected for the right reason).
+# Static tests of zip's types. Each package under tests/static/accept/ must
+# pass `bats check`; each under tests/static/reject/ must fail it exactly as
+# its `expect` says (as process's, sha256's, array's and arith's): the
+# function, the line of its src/bin/<name>.bats and patsopt's error word for
+# word, and no other error. expect.py decides, and compares patsopt's
+# variable numbers as "_" (only those: S2EVar(7788), s(1234) of a static
+# variable, $1234); expect_test.py tests it and runs first.
 # Fixtures depend on this checkout, which is uploaded to a scratch copy
 # of the repository first.
 #
@@ -11,6 +14,7 @@
 # usage: tests/static/run.sh <repository-dir>   (bats must be on PATH)
 set -eu
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+python3 -B -I "$ROOT/tests/static/expect_test.py"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 cp -R "$1" "$TMP/repo"
@@ -25,28 +29,28 @@ for a in "$TMP/repo/$PKG"/*.bats; do
 done
 
 fail=0
-check() { # dir -> runs lock + check, log in $TMP/<name>.log
-  w="$TMP/w-$(basename "$1")"
-  rm -rf "$w"; cp -R "$1" "$w"
-  # --dev: the checkout uploads as a dev version, which bats lock skips
-  # without it (as the Rust bats does).
-  (cd "$w" && bats lock --dev --repository "$TMP/repo" && bats check --repository "$TMP/repo") \
-    > "$TMP/$(basename "$1").log" 2>&1
-}
-
-for d in "$ROOT"/tests/static/accept/*/; do
-  [ -d "$d" ] || continue
-  n=$(basename "$d")
-  if check "$d"; then echo "ok   accept/$n"
-  else echo "FAIL accept/$n: should type-check"; grep -E 'error' "$TMP/$n.log" | head -5; fail=1; fi
-done
-
-for d in "$ROOT"/tests/static/reject/*/; do
-  [ -d "$d" ] || continue
-  n=$(basename "$d")
-  if check "$d"; then echo "FAIL reject/$n: should be rejected"; fail=1
-  elif grep -qF -- "$(cat "$d/expect")" "$TMP/$n.log"; then echo "ok   reject/$n"
-  else echo "FAIL reject/$n: rejected, but not with: $(cat "$d/expect")"; grep -E 'error' "$TMP/$n.log" | head -5; fail=1; fi
+for kind in accept reject; do
+  for d in "$ROOT"/tests/static/$kind/*/; do
+    [ -f "$d/bats.toml" ] || continue
+    n=$(basename "$d"); w="$TMP/w-$kind-$n"
+    cp -R "$d" "$w"
+    log="$TMP/$kind-$n.log"
+    if (cd "$w" && bats lock --dev --repository "$TMP/repo" && bats check --repository "$TMP/repo") > "$log" 2>&1; then
+      status=pass
+    else
+      status=fail
+    fi
+    if [ "$kind" = accept ] && [ "$status" = pass ]; then
+      echo "ok   accept/$n"
+    elif [ "$kind" = reject ] && [ "$status" = fail ] \
+         && python3 -B -I "$ROOT/tests/static/expect.py" "$d" "$log" > "$TMP/$n.expect" 2>&1; then
+      echo "ok   reject/$n"
+    elif [ "$kind" = reject ] && [ "$status" = fail ]; then
+      echo "FAIL reject/$n: rejected, but not as its expect says: $(cat "$TMP/$n.expect")"; tail -8 "$log"; fail=1
+    else
+      echo "FAIL $kind/$n ($status)"; tail -8 "$log"; fail=1
+    fi
+  done
 done
 # Every match is `case+`: a plain `case` (or `case-`) is not checked
 # for exhaustiveness, so a choice could lose a case unseen. Comments,

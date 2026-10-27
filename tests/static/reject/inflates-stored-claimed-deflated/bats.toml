@@ -1,6 +1,6 @@
 [package]
-name = "inflates-stored-claimed-deflated"
-kind = "lib"
+name = "inflates_stored_claimed_deflated"
+kind = "bin"
 
 [dependencies]
 "array" = ""
