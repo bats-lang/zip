@@ -830,6 +830,11 @@ primplement decsym_functional {lengths,source}{maxlen,p,first_sym,first_used,sec
 #pub dataprop FIXED_DIST($A.cells) =
   | {lengths:$A.cells} FIXED_DIST_mk(lengths) of RUN(32, 5, $A.cnil(), lengths)
 
+(* The fixed codes are prefix-free (3.2.6; keyword: fixed-fit): no length is over 15 and the codes are not over-subscribed *)
+#pub prfun fixed_litlen_fit {lengths:$A.cells} (FIXED_LITLEN(lengths)): LENGTHS_FIT(lengths, 15)
+
+#pub prfun fixed_dist_fit {lengths:$A.cells} (FIXED_DIST(lengths)): LENGTHS_FIT(lengths, 15)
+
 (* The dynamic block's header, RFC 1951 3.2.7 *)
 
 (* CL_ORDER(order): the order in which the code length code's lengths are
@@ -2237,6 +2242,221 @@ fn fixed_dist_length {lengths:$A.cells}{i:nat | i < 32} (fixed: FIXED_DIST(lengt
   prval FIXED_DIST_mk(run) = fixed
 in (run_nth_inside{32,i}(run) | 5) end
 
+(* ===== the fixed codes fit (3.2.6; keyword: fixed-fit): LENGTHS_FIT of the 288 and the 32 lengths, from their runs ===== *)
+
+prfn fixed_litlen_len {lengths:$A.cells} (fixed: FIXED_LITLEN(lengths)): $A.CLEN(lengths, 288) =
+  case+ fixed of
+  | FIXED_LITLEN_mk(run_first, run_second, run_third, run_fourth) =>
+    run_len(run_first, run_len(run_second, run_len(run_third, run_len(run_fourth, $A.CLEN_nil()))))
+
+prfn fixed_dist_len {lengths:$A.cells} (fixed: FIXED_DIST(lengths)): $A.CLEN(lengths, 32) =
+  case+ fixed of FIXED_DIST_mk(run) => run_len(run, $A.CLEN_nil())
+
+prfun run_count_same {count,until,found:nat}{value:int}{rest,all:$A.cells} .<count>.
+  (run: RUN(count, value, rest, all), counted: COUNT_BEFORE(rest, until, value, found)): COUNT_BEFORE(all, count + until, value, count + found) =
+  case+ run of
+  | RUN_zero() => counted
+  | RUN_cons(run_rest) => COUNT_BEFORE_hit(run_count_same(run_rest, counted))
+
+prfun run_count_other {count,until,found:nat}{value,other:int | value != other}{rest,all:$A.cells} .<count>.
+  (run: RUN(count, value, rest, all), counted: COUNT_BEFORE(rest, until, other, found)): COUNT_BEFORE(all, count + until, other, found) =
+  case+ run of
+  | RUN_zero() => counted
+  | RUN_cons(run_rest) => COUNT_BEFORE_miss(run_count_other(run_rest, counted))
+
+prfun run_at_most {count,maxlen:nat}{value:nat | value <= maxlen}{rest,all:$A.cells} .<count>.
+  (run: RUN(count, value, rest, all), at_most: AT_MOST(rest, maxlen)): AT_MOST(all, maxlen) =
+  case+ run of
+  | RUN_zero() => at_most
+  | RUN_cons(run_rest) => AT_MOST_cons(run_at_most(run_rest, at_most))
+
+(* the count of each length among the 288 literal/length lengths: 24 of 7, 152 of 8, 112 of 9, none of any other *)
+prfn fixed_litlen_count_seven {lengths,after_144,after_112,after_24:$A.cells}
+  (first: RUN(144, 8, after_144, lengths), second: RUN(112, 9, after_112, after_144), third: RUN(24, 7, after_24, after_112), fourth: RUN(8, 8, $A.cnil(), after_24))
+  : COUNT_BEFORE(lengths, 288, 7, 24) =
+  run_count_other(first, run_count_other(second, run_count_same(third, run_count_other(fourth, COUNT_BEFORE_zero()))))
+
+prfn fixed_litlen_count_eight {lengths,after_144,after_112,after_24:$A.cells}
+  (first: RUN(144, 8, after_144, lengths), second: RUN(112, 9, after_112, after_144), third: RUN(24, 7, after_24, after_112), fourth: RUN(8, 8, $A.cnil(), after_24))
+  : COUNT_BEFORE(lengths, 288, 8, 152) =
+  run_count_same(first, run_count_other(second, run_count_other(third, run_count_same(fourth, COUNT_BEFORE_zero()))))
+
+prfn fixed_litlen_count_nine {lengths,after_144,after_112,after_24:$A.cells}
+  (first: RUN(144, 8, after_144, lengths), second: RUN(112, 9, after_112, after_144), third: RUN(24, 7, after_24, after_112), fourth: RUN(8, 8, $A.cnil(), after_24))
+  : COUNT_BEFORE(lengths, 288, 9, 112) =
+  run_count_other(first, run_count_same(second, run_count_other(third, run_count_other(fourth, COUNT_BEFORE_zero()))))
+
+prfn fixed_litlen_count_none {len:int | len != 7; len != 8; len != 9}{lengths,after_144,after_112,after_24:$A.cells}
+  (first: RUN(144, 8, after_144, lengths), second: RUN(112, 9, after_112, after_144), third: RUN(24, 7, after_24, after_112), fourth: RUN(8, 8, $A.cnil(), after_24))
+  : COUNT_BEFORE(lengths, 288, len, 0) =
+  run_count_other(first, run_count_other(second, run_count_other(third, run_count_other(fourth, COUNT_BEFORE_zero()))))
+
+prfn fixed_litlen_bl_seven {lengths:$A.cells} (fixed: FIXED_LITLEN(lengths)): BL_COUNT(lengths, 7, 24) =
+  case+ fixed of FIXED_LITLEN_mk(first, second, third, fourth) => BL_COUNT_mk(fixed_litlen_len(fixed), fixed_litlen_count_seven(first, second, third, fourth))
+
+prfn fixed_litlen_bl_eight {lengths:$A.cells} (fixed: FIXED_LITLEN(lengths)): BL_COUNT(lengths, 8, 152) =
+  case+ fixed of FIXED_LITLEN_mk(first, second, third, fourth) => BL_COUNT_mk(fixed_litlen_len(fixed), fixed_litlen_count_eight(first, second, third, fourth))
+
+prfn fixed_litlen_bl_nine {lengths:$A.cells} (fixed: FIXED_LITLEN(lengths)): BL_COUNT(lengths, 9, 112) =
+  case+ fixed of FIXED_LITLEN_mk(first, second, third, fourth) => BL_COUNT_mk(fixed_litlen_len(fixed), fixed_litlen_count_nine(first, second, third, fourth))
+
+prfn fixed_litlen_bl_none {len:nat | 1 <= len; len != 7; len != 8; len != 9}{lengths:$A.cells} (fixed: FIXED_LITLEN(lengths)): BL_COUNT(lengths, len, 0) =
+  case+ fixed of FIXED_LITLEN_mk(first, second, third, fourth) => BL_COUNT_mk(fixed_litlen_len(fixed), fixed_litlen_count_none{len}(first, second, third, fourth))
+
+prfn fixed_dist_bl_five {lengths:$A.cells} (fixed: FIXED_DIST(lengths)): BL_COUNT(lengths, 5, 32) =
+  case+ fixed of FIXED_DIST_mk(run) => BL_COUNT_mk(fixed_dist_len(fixed), run_count_same(run, COUNT_BEFORE_zero()))
+
+prfn fixed_dist_bl_none {len:nat | 1 <= len; len != 5}{lengths:$A.cells} (fixed: FIXED_DIST(lengths)): BL_COUNT(lengths, len, 0) =
+  case+ fixed of FIXED_DIST_mk(run) => BL_COUNT_mk(fixed_dist_len(fixed), run_count_other(run, COUNT_BEFORE_zero()))
+
+
+prfn _fixed_litlen_fit {lengths:$A.cells} (fixed: FIXED_LITLEN(lengths)): LENGTHS_FIT(lengths, 15) = let
+  prval FIXED_LITLEN_mk(first, second, third, fourth) = fixed
+  prval at_most = run_at_most(first, run_at_most(second, run_at_most(third, run_at_most(fourth, AT_MOST_nil{15}()))))
+  prval next_1 = NEXT_CODE_first{lengths}()
+  prval bl_1 = fixed_litlen_bl_none{1}(fixed)
+  prval pow_1 = $AR.POW2_succ($AR.POW2_zero())
+  prval fit_1 = LEN_FIT_step(LEN_FIT_zero(), next_1, bl_1, pow_1)
+  prval next_2 = NEXT_CODE_next(next_1, bl_1)
+  prval bl_2 = fixed_litlen_bl_none{2}(fixed)
+  prval pow_2 = $AR.POW2_succ(pow_1)
+  prval fit_2 = LEN_FIT_step(fit_1, next_2, bl_2, pow_2)
+  prval next_3 = NEXT_CODE_next(next_2, bl_2)
+  prval bl_3 = fixed_litlen_bl_none{3}(fixed)
+  prval pow_3 = $AR.POW2_succ(pow_2)
+  prval fit_3 = LEN_FIT_step(fit_2, next_3, bl_3, pow_3)
+  prval next_4 = NEXT_CODE_next(next_3, bl_3)
+  prval bl_4 = fixed_litlen_bl_none{4}(fixed)
+  prval pow_4 = $AR.POW2_succ(pow_3)
+  prval fit_4 = LEN_FIT_step(fit_3, next_4, bl_4, pow_4)
+  prval next_5 = NEXT_CODE_next(next_4, bl_4)
+  prval bl_5 = fixed_litlen_bl_none{5}(fixed)
+  prval pow_5 = $AR.POW2_succ(pow_4)
+  prval fit_5 = LEN_FIT_step(fit_4, next_5, bl_5, pow_5)
+  prval next_6 = NEXT_CODE_next(next_5, bl_5)
+  prval bl_6 = fixed_litlen_bl_none{6}(fixed)
+  prval pow_6 = $AR.POW2_succ(pow_5)
+  prval fit_6 = LEN_FIT_step(fit_5, next_6, bl_6, pow_6)
+  prval next_7 = NEXT_CODE_next(next_6, bl_6)
+  prval bl_7 = fixed_litlen_bl_seven(fixed)
+  prval pow_7 = $AR.POW2_succ(pow_6)
+  prval fit_7 = LEN_FIT_step(fit_6, next_7, bl_7, pow_7)
+  prval next_8 = NEXT_CODE_next(next_7, bl_7)
+  prval bl_8 = fixed_litlen_bl_eight(fixed)
+  prval pow_8 = $AR.POW2_succ(pow_7)
+  prval fit_8 = LEN_FIT_step(fit_7, next_8, bl_8, pow_8)
+  prval next_9 = NEXT_CODE_next(next_8, bl_8)
+  prval bl_9 = fixed_litlen_bl_nine(fixed)
+  prval pow_9 = $AR.POW2_succ(pow_8)
+  prval fit_9 = LEN_FIT_step(fit_8, next_9, bl_9, pow_9)
+  prval next_10 = NEXT_CODE_next(next_9, bl_9)
+  prval bl_10 = fixed_litlen_bl_none{10}(fixed)
+  prval pow_10 = $AR.POW2_succ(pow_9)
+  prval fit_10 = LEN_FIT_step(fit_9, next_10, bl_10, pow_10)
+  prval next_11 = NEXT_CODE_next(next_10, bl_10)
+  prval bl_11 = fixed_litlen_bl_none{11}(fixed)
+  prval pow_11 = $AR.POW2_succ(pow_10)
+  prval fit_11 = LEN_FIT_step(fit_10, next_11, bl_11, pow_11)
+  prval next_12 = NEXT_CODE_next(next_11, bl_11)
+  prval bl_12 = fixed_litlen_bl_none{12}(fixed)
+  prval pow_12 = $AR.POW2_succ(pow_11)
+  prval fit_12 = LEN_FIT_step(fit_11, next_12, bl_12, pow_12)
+  prval next_13 = NEXT_CODE_next(next_12, bl_12)
+  prval bl_13 = fixed_litlen_bl_none{13}(fixed)
+  prval pow_13 = $AR.POW2_succ(pow_12)
+  prval fit_13 = LEN_FIT_step(fit_12, next_13, bl_13, pow_13)
+  prval next_14 = NEXT_CODE_next(next_13, bl_13)
+  prval bl_14 = fixed_litlen_bl_none{14}(fixed)
+  prval pow_14 = $AR.POW2_succ(pow_13)
+  prval fit_14 = LEN_FIT_step(fit_13, next_14, bl_14, pow_14)
+  prval next_15 = NEXT_CODE_next(next_14, bl_14)
+  prval bl_15 = fixed_litlen_bl_none{15}(fixed)
+  prval pow_15 = $AR.POW2_succ(pow_14)
+  prval fit_15 = LEN_FIT_step(fit_14, next_15, bl_15, pow_15)
+in LENGTHS_FIT_mk(at_most, fit_15) end
+
+prfn _fixed_dist_fit {lengths:$A.cells} (fixed: FIXED_DIST(lengths)): LENGTHS_FIT(lengths, 15) = let
+  prval FIXED_DIST_mk(run) = fixed
+  prval at_most = run_at_most(run, AT_MOST_nil{15}())
+  prval next_1 = NEXT_CODE_first{lengths}()
+  prval bl_1 = fixed_dist_bl_none{1}(fixed)
+  prval pow_1 = $AR.POW2_succ($AR.POW2_zero())
+  prval fit_1 = LEN_FIT_step(LEN_FIT_zero(), next_1, bl_1, pow_1)
+  prval next_2 = NEXT_CODE_next(next_1, bl_1)
+  prval bl_2 = fixed_dist_bl_none{2}(fixed)
+  prval pow_2 = $AR.POW2_succ(pow_1)
+  prval fit_2 = LEN_FIT_step(fit_1, next_2, bl_2, pow_2)
+  prval next_3 = NEXT_CODE_next(next_2, bl_2)
+  prval bl_3 = fixed_dist_bl_none{3}(fixed)
+  prval pow_3 = $AR.POW2_succ(pow_2)
+  prval fit_3 = LEN_FIT_step(fit_2, next_3, bl_3, pow_3)
+  prval next_4 = NEXT_CODE_next(next_3, bl_3)
+  prval bl_4 = fixed_dist_bl_none{4}(fixed)
+  prval pow_4 = $AR.POW2_succ(pow_3)
+  prval fit_4 = LEN_FIT_step(fit_3, next_4, bl_4, pow_4)
+  prval next_5 = NEXT_CODE_next(next_4, bl_4)
+  prval bl_5 = fixed_dist_bl_five(fixed)
+  prval pow_5 = $AR.POW2_succ(pow_4)
+  prval fit_5 = LEN_FIT_step(fit_4, next_5, bl_5, pow_5)
+  prval next_6 = NEXT_CODE_next(next_5, bl_5)
+  prval bl_6 = fixed_dist_bl_none{6}(fixed)
+  prval pow_6 = $AR.POW2_succ(pow_5)
+  prval fit_6 = LEN_FIT_step(fit_5, next_6, bl_6, pow_6)
+  prval next_7 = NEXT_CODE_next(next_6, bl_6)
+  prval bl_7 = fixed_dist_bl_none{7}(fixed)
+  prval pow_7 = $AR.POW2_succ(pow_6)
+  prval fit_7 = LEN_FIT_step(fit_6, next_7, bl_7, pow_7)
+  prval next_8 = NEXT_CODE_next(next_7, bl_7)
+  prval bl_8 = fixed_dist_bl_none{8}(fixed)
+  prval pow_8 = $AR.POW2_succ(pow_7)
+  prval fit_8 = LEN_FIT_step(fit_7, next_8, bl_8, pow_8)
+  prval next_9 = NEXT_CODE_next(next_8, bl_8)
+  prval bl_9 = fixed_dist_bl_none{9}(fixed)
+  prval pow_9 = $AR.POW2_succ(pow_8)
+  prval fit_9 = LEN_FIT_step(fit_8, next_9, bl_9, pow_9)
+  prval next_10 = NEXT_CODE_next(next_9, bl_9)
+  prval bl_10 = fixed_dist_bl_none{10}(fixed)
+  prval pow_10 = $AR.POW2_succ(pow_9)
+  prval fit_10 = LEN_FIT_step(fit_9, next_10, bl_10, pow_10)
+  prval next_11 = NEXT_CODE_next(next_10, bl_10)
+  prval bl_11 = fixed_dist_bl_none{11}(fixed)
+  prval pow_11 = $AR.POW2_succ(pow_10)
+  prval fit_11 = LEN_FIT_step(fit_10, next_11, bl_11, pow_11)
+  prval next_12 = NEXT_CODE_next(next_11, bl_11)
+  prval bl_12 = fixed_dist_bl_none{12}(fixed)
+  prval pow_12 = $AR.POW2_succ(pow_11)
+  prval fit_12 = LEN_FIT_step(fit_11, next_12, bl_12, pow_12)
+  prval next_13 = NEXT_CODE_next(next_12, bl_12)
+  prval bl_13 = fixed_dist_bl_none{13}(fixed)
+  prval pow_13 = $AR.POW2_succ(pow_12)
+  prval fit_13 = LEN_FIT_step(fit_12, next_13, bl_13, pow_13)
+  prval next_14 = NEXT_CODE_next(next_13, bl_13)
+  prval bl_14 = fixed_dist_bl_none{14}(fixed)
+  prval pow_14 = $AR.POW2_succ(pow_13)
+  prval fit_14 = LEN_FIT_step(fit_13, next_14, bl_14, pow_14)
+  prval next_15 = NEXT_CODE_next(next_14, bl_14)
+  prval bl_15 = fixed_dist_bl_none{15}(fixed)
+  prval pow_15 = $AR.POW2_succ(pow_14)
+  prval fit_15 = LEN_FIT_step(fit_14, next_15, bl_15, pow_15)
+in LENGTHS_FIT_mk(at_most, fit_15) end
+
+(* a fit over maxlen gives the bound at each length up to it: next_code[len] + bl_count[len] <= 2 to the len *)
+prfun len_fit_bound {lengths:$A.cells}{maxlen,len,first_code,count,power:nat | 1 <= len; len <= maxlen} .<maxlen>.
+  (fit: LEN_FIT(lengths, maxlen), next: NEXT_CODE(lengths, len, first_code), counted: BL_COUNT(lengths, len, count), pow: $AR.POW2(len, power))
+  : [first_code + count <= power] void =
+  case+ fit of
+  | LEN_FIT_step(fit_rest, step_next, step_counted, step_pow) =>
+    sif len == maxlen then let
+      prval () = next_code_functional(next, step_next)
+      prval () = bl_count_functional(counted, step_counted)
+      prval () = _pow2_functional(pow, step_pow)
+    in () end
+    else len_fit_bound(fit_rest, next, counted, pow)
+
+primplement fixed_litlen_fit {lengths} (fixed) = _fixed_litlen_fit(fixed)
+
+primplement fixed_dist_fit {lengths} (fixed) = _fixed_dist_fit(fixed)
+
 (* The code lengths of an alphabet of n symbols, read by symbol: the fixed codes' by their runs (3.2.6), the
    others' from an array of 320 lengths (a block's literal/length and distance lengths), starting at offset *)
 datavtype lengths_view($A.cells, int) =
@@ -2393,6 +2613,32 @@ fun build_loop {lengths:$A.cells}{n,maxlen,len:nat | len <= maxlen; maxlen <= 15
       val () = $A.iarr_free(counts)
     in build_over_subscribed() end
   end
+
+(* the tables of a code whose fit is a proof: no length is checked at run time (the fixed codes, fixed_litlen_fit) *)
+fun build_fitted_loop {lengths:$A.cells}{n,maxlen,len:nat | len <= maxlen; maxlen <= 15}{firsts,counts:$A.cells}{l1,l2:agz}{first_code:nat | first_code <= 65536} .<maxlen - len>.
+  (whole: LEN_FIT(lengths, maxlen), table: TABLE_UPTO(lengths, firsts, counts, len), fit: LEN_FIT(lengths, len), next: NEXT_CODE(lengths, len + 1, first_code) |
+   view: !lengths_view(lengths, n), firsts: $A.iarr(l1, 16, firsts), counts: $A.iarr(l2, 16, counts), n: int n, maxlen: int maxlen, len: int len, first_code: int first_code)
+  : tables(lengths, maxlen) =
+  if len >= maxlen then tables_made(table, fit | firsts, counts)
+  else let
+    val (counted | count) = count_scan(COUNT_BEFORE_zero() | view, n, len + 1, 0, 0)
+    val (lengths_len | ()) = lengths_len(view)
+    prval bl = BL_COUNT_mk(lengths_len, counted)
+    val (pow_pf | _) = pow2_of(len + 1)
+    prval () = len_fit_bound(whole, next, bl, pow_pf)
+    val (set_first | firsts2) = $A.iarr_set(firsts, len + 1, first_code)
+    val (set_count | counts2) = $A.iarr_set(counts, len + 1, count)
+    prval table2 = table_extend(table, set_first, set_count, next, bl)
+    prval fit2 = LEN_FIT_step(fit, next, bl, pow_pf)
+    prval next2 = NEXT_CODE_next(next, bl)
+  in build_fitted_loop(whole, table2, fit2, next2 | view, firsts2, counts2, n, maxlen, len + 1, 2 * (first_code + count)) end
+
+fn make_fitted_code {lengths:$A.cells}{n,maxlen:nat | 1 <= maxlen; maxlen <= 15}
+  (fitted: LENGTHS_FIT(lengths, maxlen) | view: !lengths_view(lengths, n), n: int n, maxlen: int maxlen): tables(lengths, maxlen) = let
+  prval LENGTHS_FIT_mk(_, whole) = fitted
+  val (firsts_len, firsts_zeros | firsts) = $A.iarr_alloc(16)
+  val (counts_len, counts_zeros | counts) = $A.iarr_alloc(16)
+in build_fitted_loop(whole, TABLE_UPTO_zero(), LEN_FIT_zero(), NEXT_CODE_first() | view, firsts, counts, n, maxlen, 0, 0) end
 
 #target native begin
 
@@ -3372,14 +3618,6 @@ fn free_view {lengths:$A.cells}{n:nat} (view: lengths_view(lengths, n)): void =
   | ~lengths_of_fixed_dist(_, _ | ) => ()
   | ~lengths_of_array(_, _ | array) => $A.barr_free(array)
 
-prfn fixed_litlen_len {lengths:$A.cells} (fixed: FIXED_LITLEN(lengths)): $A.CLEN(lengths, 288) =
-  case+ fixed of
-  | FIXED_LITLEN_mk(run_first, run_second, run_third, run_fourth) =>
-    run_len(run_first, run_len(run_second, run_len(run_third, run_len(run_fourth, $A.CLEN_nil()))))
-
-prfn fixed_dist_len {lengths:$A.cells} (fixed: FIXED_DIST(lengths)): $A.CLEN(lengths, 32) =
-  case+ fixed of FIXED_DIST_mk(run) => run_len(run, $A.CLEN_nil())
-
 (* a block with the fixed codes (3.2.6), its three header bits read *)
 fn decode_fixed {in_memory:bool}{owner:addr}{source:$A.cells}{out:$A.cells}{written:nat}
   {front,have,first_byte,size_in,byte_pos,bit_pos:nat | front <= byte_pos; front <= have; have <= size_in; 8 * byte_pos + bit_pos <= 8 * have; bit_pos < 8}
@@ -3389,38 +3627,24 @@ fn decode_fixed {in_memory:bool}{owner:addr}{source:$A.cells}{out:$A.cells}{writ
      bool ok, input(owner, source2, front2, have2, first_byte, size_in), sink(in_memory, out2, written2), int byte2, int bit2) = let
   prval [litlen:$A.cells] fixed_litlen = fixed_litlen_make()
   prval [dist:$A.cells] fixed_dist = fixed_dist_make()
+  prval litlen_fit = fixed_litlen_fit(fixed_litlen)
+  prval dist_fit = fixed_dist_fit(fixed_dist)
   val litlen_view = lengths_of_fixed_litlen(fixed_litlen, fixed_litlen_len(fixed_litlen) | )
   val dist_view = lengths_of_fixed_dist(fixed_dist, fixed_dist_len(fixed_dist) | )
-  val litlen_code = make_code(litlen_view, 288, 15)
-  val dist_code = make_code(dist_view, 32, 15)
+  val litlen_tab = make_fitted_code(litlen_fit | litlen_view, 288, 15)
+  val dist_tab = make_fitted_code(dist_fit | dist_view, 32, 15)
+  val (have_len | _) = input_have(inp)
+  val (syms_opt | syms_ok, inp2, snk2, byte2, bit2) =
+    symbols_loop(SYMS_PREFIX_empty(), ext_refl(have_len) | litlen_view, litlen_tab, 288, dist_view, dist_tab, 32, inp, snk, byte_pos, bit_pos)
+  val () = free_tables(litlen_tab)
+  val () = free_tables(dist_tab)
+  val () = free_view(litlen_view)
+  val () = free_view(dist_view)
 in
-  case+ litlen_code of
-  | ~code_ok(litlen_fit | litlen_tab) =>
-    (case+ dist_code of
-     | ~code_ok(dist_fit | dist_tab) => let
-         val (have_len | _) = input_have(inp)
-         val (syms_opt | syms_ok, inp2, snk2, byte2, bit2) =
-           symbols_loop(SYMS_PREFIX_empty(), ext_refl(have_len) | litlen_view, litlen_tab, 288, dist_view, dist_tab, 32, inp, snk, byte_pos, bit_pos)
-         val () = free_tables(litlen_tab)
-         val () = free_tables(dist_tab)
-         val () = free_view(litlen_view)
-         val () = free_view(dist_view)
-       in
-         if syms_ok then let
-           prval Some_v(SYMS_DONE_mk(syms_ext, syms, syms_len)) = syms_opt
-         in (Some_v(BLOCK_DONE_mk(syms_ext, BLOCK_fixed(fixed_litlen, fixed_dist, litlen_fit, dist_fit, syms), syms_len)) | true, inp2, snk2, byte2, bit2) end
-         else let prval None_v() = syms_opt in (None_v() | false, inp2, snk2, byte2, bit2) end
-       end
-     | ~code_refused() => let
-         val () = free_tables(litlen_tab)
-         val () = free_view(litlen_view)
-         val () = free_view(dist_view)
-       in (None_v() | false, inp, snk, 0, 0) end)
-  | ~code_refused() => let
-      val () = free_view(litlen_view)
-      val () = free_view(dist_view)
-      val () = (case+ dist_code of ~code_ok(_ | tab) => free_tables(tab) | ~code_refused() => ())
-    in (None_v() | false, inp, snk, 0, 0) end
+  if syms_ok then let
+    prval Some_v(SYMS_DONE_mk(syms_ext, syms, syms_len)) = syms_opt
+  in (Some_v(BLOCK_DONE_mk(syms_ext, BLOCK_fixed(fixed_litlen, fixed_dist, litlen_fit, dist_fit, syms), syms_len)) | true, inp2, snk2, byte2, bit2) end
+  else let prval None_v() = syms_opt in (None_v() | false, inp2, snk2, byte2, bit2) end
 end
 
 (* ===== batch 13: a block, moved to a longer source ===== *)
@@ -4219,7 +4443,7 @@ fun copy_borrowed {cells,leading,rest,new_junk,new_cells:$A.cells}{n,i:nat | i <
 
 #pub datavtype inflated_cells(compressed: $A.cells) =
   | {output:$A.cells}{size:pos | size <= 1048576}{l:agz}
-    inflated_cells_done(compressed) of (INFLATES(inflate_deflated(), compressed, output), $A.CLEN(output, size) | $A.barr(l, size, output))
+    inflated_cells_done(compressed) of (INFLATES(inflate_deflated(), compressed, output), $A.CLEN(output, size) | $A.barr(l, size, output), int size)
   | inflated_cells_empty(compressed) of (INFLATES(inflate_deflated(), compressed, $A.cnil()) | )
   | inflated_cells_malformed(compressed) of ()
   | inflated_cells_too_large(compressed) of ()
@@ -4258,7 +4482,7 @@ fn memory_inflate {l:agz}{n:nat | n <= 1048576}{cs:$A.cells}
           prval $A.CELLS_EQ_refl() = clen_zero(junk_len)
           prval $A.CELLS_EQ_refl() = append_nil_right(copied_sized)
           val () = $A.barr_free(output_barr)
-        in inflated_cells_done(INFLATES_deflated(blocks), output_len | exact2) end
+        in inflated_cells_done(INFLATES_deflated(blocks), output_len | exact2, written) end
       | ~sink_memory_overflow(output_barr) => let
           val () = $A.barr_free(output_barr)
         in inflated_cells_empty(INFLATES_deflated(blocks) | ) end

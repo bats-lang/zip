@@ -1,0 +1,9 @@
+[package]
+name = "fixed-fit-use"
+kind = "lib"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

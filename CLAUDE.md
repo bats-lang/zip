@@ -109,9 +109,11 @@ its relation (`SYMS`, `BLOCK`, `BLOCKS`), and a later read of more input is carr
 by `EXT` (the cells so far are a prefix of the whole), so no link of the chain is rebuilt. A stored
 decoder refuses a stream whose first block is not stored, as the Deflate decoder refuses BTYPE 3, a
 LEN that is not the complement of NLEN and a stream that ends inside a block. The fixed code's lengths
-are built by `fixed_litlen_make` and `fixed_dist_make` (runs, `RUN`) and checked by the same
-`LENGTHS_FIT` test as a dynamic block's, run at the table build (a decision of the code, not a proof of
-the 288 lengths). Rejected and accepted by `tests/static/{accept,reject}/inflate-*`, `inflated-*` and
+are built by `fixed_litlen_make` and `fixed_dist_make` (runs, `RUN`), and their `LENGTHS_FIT` is the lemma
+`fixed_litlen_fit` / `fixed_dist_fit` (keyword: fixed-fit): the count of each length among the runs
+(`run_count_same`, `run_count_other`), then next_code and the bound at each length 1 to 15, so the tables
+of a fixed block are built by `make_fitted_code`, which has no refusal. A dynamic block's lengths are
+only known when read, so `make_code` decides their fit while it builds the tables and answers the proof or a refusal. Rejected and accepted by `tests/static/{accept,reject}/inflate-*`, `inflated-*` and
 `reader-fate-*`; every lemma has false variants (the four accepted mutants are weaker true statements
 or free variables, in `tests/static/mutation_known.txt`).
 

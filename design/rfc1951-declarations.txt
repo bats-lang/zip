@@ -952,9 +952,14 @@ primplement inflates_functional {kind}{compressed,first,second} (first_proof, se
   (reader: $F.content_reader($A.cnil(), start, size_in), writer: $F.content_writer($A.cnil()), start: int start, size_in: int size_in): inflated(start, size_in)
 
 (* Differences of the compiled decoders from the declarations above (zip#64, step 7), kept equal to src/lib.bats:
+   - inflated_cells_done carries the output's size as an int beside the barr (a caller cannot read a barr without it).
    - writer_held carries no index; inflate_failure has failure_too_large; inflated_cells has inflated_cells_empty
      (a stream with no output) beside done, malformed and too_large.
    - inflate_cells_proved and inflate_stored_cells_proved take (size: CLEN(cs, n) | compressed: !cborrow(l, n, cs), n: int n)
      with {n:nat | n <= 1048576}.
    - the input and sink datavtypes carry owner (memory or external) and in_memory indices, private to the module.
-   - the fixed code's LENGTHS_FIT is established by the table build's fit check, not by a lemma over the 288 lengths. *)
+   - the fixed codes' LENGTHS_FIT is the lemma fixed_litlen_fit / fixed_dist_fit (below), not a check at the table build. *)
+
+#pub prfun fixed_litlen_fit {lengths:$A.cells} (FIXED_LITLEN(lengths)): LENGTHS_FIT(lengths, 15)
+
+#pub prfun fixed_dist_fit {lengths:$A.cells} (FIXED_DIST(lengths)): LENGTHS_FIT(lengths, 15)

@@ -1,0 +1,9 @@
+[package]
+name = "fixed_litlen_fit_of_dist"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

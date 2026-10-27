@@ -6,7 +6,7 @@
 (* the output barr holds the cells the proof names, not others *)
 fn _other {compressed,other:$A.cells} (answer: $Z.inflated_cells(compressed)): int =
   case+ answer of
-  | ~$Z.inflated_cells_done(inflates, output_len | output) => let
+  | ~$Z.inflated_cells_done(inflates, output_len | output, output_size) => let
       val taken: [l:agz][size:pos] $A.barr(l, size, other) = output
     in ($A.barr_free(taken); 1) end
   | ~$Z.inflated_cells_empty(inflates | ) => 2
