@@ -1,0 +1,9 @@
+[package]
+name = "block_stored_output_not_appended"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

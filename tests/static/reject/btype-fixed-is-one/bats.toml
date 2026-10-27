@@ -1,0 +1,9 @@
+[package]
+name = "btype_fixed_is_one"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

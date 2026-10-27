@@ -1,0 +1,9 @@
+[package]
+name = "inflates_deflated_from_nonempty_output"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

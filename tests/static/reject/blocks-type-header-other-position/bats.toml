@@ -1,0 +1,9 @@
+[package]
+name = "blocks_type_header_other_position"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

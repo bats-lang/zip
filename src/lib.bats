@@ -886,6 +886,117 @@ primplement decsym_functional {lengths,source}{maxlen,p,first_sym,first_used,sec
   | BTYPE_fixed(block_fixed(), 1)
   | BTYPE_dynamic(block_dynamic(), 2)
 
+(* BLOCK(kind, source, p, before, after, end_bit): a block of the kind whose
+   body starts at bit p (after its 3 header bits) takes the output before to
+   after, and ends at bit end_bit. A constructor for each kind: the stored one
+   here (3.2.4), the fixed and the dynamic with the steps that follow (keyword: blocks). *)
+#pub dataprop BLOCK(block_kind, $A.cells, int, $A.cells, $A.cells, int) =
+  (* skips to the byte boundary, LEN, NLEN = the complement of LEN, then LEN bytes *)
+  | {source:$A.cells}{p,data_byte,len,nlen:nat | 8 * data_byte >= p; 8 * data_byte < p + 8; len + nlen == 65535}{before,data,after:$A.cells}
+    BLOCK_stored(block_stored(), source, p, before, after, 8 * (data_byte + 4 + len))
+    of (BITS(source, 8 * data_byte, 16, len), BITS(source, 8 * data_byte + 16, 16, nlen), SLICE(source, data_byte + 4, len, data), $A.APPEND(before, data, after))
+
+#pub prfun slice_functional {source:$A.cells}{start,width:nat}{first,second:$A.cells}
+  (SLICE(source, start, width, first), SLICE(source, start, width, second)): $A.CELLS_EQ(first, second)
+
+#pub prfun block_functional {kind:block_kind}{source:$A.cells}{p:nat}{before,first,second:$A.cells}{first_end,second_end:nat}
+  (BLOCK(kind, source, p, before, first, first_end), BLOCK(kind, source, p, before, second, second_end)): [first_end == second_end] $A.CELLS_EQ(first, second)
+
+(* BLOCKS_SIZED(source, p, before, after, blocks): the blocks from bit p, ending
+   at the one with BFINAL 1, take the output before to after, and there are
+   blocks + 1 of them; the count is what a lemma's termination metric reads, as
+   array's APPEND_SIZED (keyword: blocks). *)
+#pub dataprop BLOCKS_SIZED($A.cells, int, $A.cells, $A.cells, int) =
+  | {source:$A.cells}{p,btype,end_bit:nat}{kind:block_kind}{before,after:$A.cells}
+    BLOCKS_SIZED_last(source, p, before, after, 0) of (BITS(source, p, 1, 1), BITS(source, p + 1, 2, btype), BTYPE(kind, btype), BLOCK(kind, source, p + 3, before, after, end_bit))
+  | {source:$A.cells}{p,btype,end_bit,blocks:nat}{kind:block_kind}{before,middle,after:$A.cells}
+    BLOCKS_SIZED_next(source, p, before, after, blocks + 1) of (BITS(source, p, 1, 0), BITS(source, p + 1, 2, btype), BTYPE(kind, btype), BLOCK(kind, source, p + 3, before, middle, end_bit), BLOCKS_SIZED(source, end_bit, middle, after, blocks))
+
+(* BLOCKS(source, p, before, after): the blocks from bit p, ending at the one
+   with BFINAL 1, take the output before to after. Made by BLOCKS_last and
+   BLOCKS_next below, as APPEND is by APPEND_nil and APPEND_cons. *)
+#pub dataprop BLOCKS($A.cells, int, $A.cells, $A.cells) =
+  | {source:$A.cells}{p:nat}{before,after:$A.cells}{blocks:nat} BLOCKS_made(source, p, before, after) of BLOCKS_SIZED(source, p, before, after, blocks)
+
+#pub prfun BLOCKS_last {source:$A.cells}{p,btype,end_bit:nat}{kind:block_kind}{before,after:$A.cells}
+  (BITS(source, p, 1, 1), BITS(source, p + 1, 2, btype), BTYPE(kind, btype), BLOCK(kind, source, p + 3, before, after, end_bit)): BLOCKS(source, p, before, after)
+
+#pub prfun BLOCKS_next {source:$A.cells}{p,btype,end_bit:nat}{kind:block_kind}{before,middle,after:$A.cells}
+  (BITS(source, p, 1, 0), BITS(source, p + 1, 2, btype), BTYPE(kind, btype), BLOCK(kind, source, p + 3, before, middle, end_bit), BLOCKS(source, end_bit, middle, after)): BLOCKS(source, p, before, after)
+
+#pub prfun blocks_functional {source:$A.cells}{p:nat}{before,first,second:$A.cells}
+  (BLOCKS(source, p, before, first), BLOCKS(source, p, before, second)): $A.CELLS_EQ(first, second)
+
+prfun _slice_functional {source:$A.cells}{start,width:nat}{first,second:$A.cells} .<width>.
+  (first_slice: SLICE(source, start, width, first), second_slice: SLICE(source, start, width, second)): $A.CELLS_EQ(first, second) =
+  case+ first_slice of
+  | SLICE_nil() => (case+ second_slice of SLICE_nil() => $A.CELLS_EQ_refl())
+  | SLICE_cons(first_nth, first_rest) =>
+    (case+ second_slice of
+     | SLICE_cons(second_nth, second_rest) => let
+         prval () = $A.nth_functional(first_nth, second_nth)
+       in (case+ _slice_functional(first_rest, second_rest) of $A.CELLS_EQ_refl() => $A.CELLS_EQ_refl()) end)
+
+primplement slice_functional {source}{start,width}{first,second} (first_slice, second_slice) = _slice_functional(first_slice, second_slice)
+
+prfun _block_functional {kind:block_kind}{source:$A.cells}{p:nat}{before,first,second:$A.cells}{first_end,second_end:nat} .<>.
+  (first_block: BLOCK(kind, source, p, before, first, first_end), second_block: BLOCK(kind, source, p, before, second, second_end))
+  : [first_end == second_end] $A.CELLS_EQ(first, second) =
+  case+ first_block of
+  | BLOCK_stored(first_len, first_nlen, first_slice, first_append) =>
+    (case+ second_block of
+     | BLOCK_stored(second_len, second_nlen, second_slice, second_append) => let
+         prval () = bits_functional(first_len, second_len)
+       in
+         (case+ slice_functional(first_slice, second_slice) of
+          | $A.CELLS_EQ_refl() => $A.append_functional(first_append, second_append))
+       end)
+
+primplement block_functional {kind}{source}{p}{before,first,second}{first_end,second_end} (first_block, second_block) = _block_functional(first_block, second_block)
+
+prfun _blocks_sized_functional {source:$A.cells}{p:nat}{before,first,second:$A.cells}{first_blocks,second_blocks:nat} .<first_blocks>.
+  (first_proof: BLOCKS_SIZED(source, p, before, first, first_blocks), second_proof: BLOCKS_SIZED(source, p, before, second, second_blocks))
+  : $A.CELLS_EQ(first, second) =
+  case+ first_proof of
+  | BLOCKS_SIZED_last(first_final, first_bits, first_btype, first_block) =>
+    (case+ second_proof of
+     | BLOCKS_SIZED_last(second_final, second_bits, second_btype, second_block) => let
+         prval () = bits_functional(first_bits, second_bits)
+       in
+         (case+ first_btype of
+          | BTYPE_stored() => (case+ second_btype of BTYPE_stored() => (case+ block_functional(first_block, second_block) of $A.CELLS_EQ_refl() => $A.CELLS_EQ_refl()))
+          | BTYPE_fixed() => (case+ second_btype of BTYPE_fixed() => (case+ block_functional(first_block, second_block) of $A.CELLS_EQ_refl() => $A.CELLS_EQ_refl()))
+          | BTYPE_dynamic() => (case+ second_btype of BTYPE_dynamic() => (case+ block_functional(first_block, second_block) of $A.CELLS_EQ_refl() => $A.CELLS_EQ_refl())))
+       end
+     | BLOCKS_SIZED_next(second_final, _, _, _, _) =>
+       (let
+          prval () = bits_functional(first_final, second_final)
+        in $A.CELLS_EQ_refl() end))
+  | BLOCKS_SIZED_next(first_final, first_bits, first_btype, first_block, first_rest) =>
+    (case+ second_proof of
+     | BLOCKS_SIZED_last(second_final, _, _, _) =>
+       (let
+          prval () = bits_functional(first_final, second_final)
+        in $A.CELLS_EQ_refl() end)
+     | BLOCKS_SIZED_next(second_final, second_bits, second_btype, second_block, second_rest) =>
+       (let
+          prval () = bits_functional(first_bits, second_bits)
+        in
+          (case+ first_btype of
+           | BTYPE_stored() => (case+ second_btype of BTYPE_stored() => (case+ block_functional(first_block, second_block) of $A.CELLS_EQ_refl() => _blocks_sized_functional(first_rest, second_rest)))
+           | BTYPE_fixed() => (case+ second_btype of BTYPE_fixed() => (case+ block_functional(first_block, second_block) of $A.CELLS_EQ_refl() => _blocks_sized_functional(first_rest, second_rest)))
+           | BTYPE_dynamic() => (case+ second_btype of BTYPE_dynamic() => (case+ block_functional(first_block, second_block) of $A.CELLS_EQ_refl() => _blocks_sized_functional(first_rest, second_rest))))
+        end))
+
+primplement blocks_functional {source}{p}{before,first,second} (first_proof, second_proof) =
+  (case+ first_proof of
+   | BLOCKS_made(first_sized) => (case+ second_proof of BLOCKS_made(second_sized) => _blocks_sized_functional(first_sized, second_sized)))
+
+primplement BLOCKS_last {source}{p,btype,end_bit}{kind}{before,after} (final, bits, btype, block) = BLOCKS_made(BLOCKS_SIZED_last(final, bits, btype, block))
+
+primplement BLOCKS_next {source}{p,btype,end_bit}{kind}{before,middle,after} (final, bits, btype, block, rest) =
+  (case+ rest of BLOCKS_made(rest_sized) => BLOCKS_made(BLOCKS_SIZED_next(final, bits, btype, block, rest_sized)))
+
 (* Window storage (streaming window keyword): one barr of 65536 bytes, the last 32768 bytes of output plus the half being filled, well inside barr_alloc's bound; no arena.
    The decoder keeps a window, not the output: a back-reference reaches at
    most 32768 bytes back (3.2.5). TAKE_LAST(output, keep, window): window is
@@ -1006,6 +1117,8 @@ primplement length_range {sym,extra_bits,base,value}{source}{p} (symbol, bits) =
    that follow (RFC 1951) *)
 #pub dataprop INFLATES(inflate_kind, $A.cells, $A.cells) =
   | {cs:$A.cells} INFLATES_stored(inflate_stored(), cs, cs)
+  (* the Deflate stream (RFC 1951) from bit 0, with no output before it *)
+  | {compressed,output:$A.cells} INFLATES_deflated(inflate_deflated(), compressed, output) of BLOCKS(compressed, 0, $A.cnil(), output)
 
 (* The same compressed cells, by the same method, inflate to the same
    output cells *)
@@ -1015,3 +1128,7 @@ primplement length_range {sym,extra_bits,base,value}{source}{p} (symbol, bits) =
 primplement inflates_functional {kind}{compressed,first,second} (first_proof, second_proof) =
   case+ first_proof of
   | INFLATES_stored() => (case+ second_proof of INFLATES_stored() => CELLS_EQ_refl())
+  | INFLATES_deflated(first_blocks) =>
+    (case+ second_proof of
+     | INFLATES_deflated(second_blocks) =>
+       (case+ blocks_functional(first_blocks, second_blocks) of $A.CELLS_EQ_refl() => CELLS_EQ_refl()))

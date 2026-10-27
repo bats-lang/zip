@@ -1,0 +1,9 @@
+[package]
+name = "block-stored-control"
+kind = "lib"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

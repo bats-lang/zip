@@ -1,0 +1,9 @@
+[package]
+name = "slice_functional_distinct"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

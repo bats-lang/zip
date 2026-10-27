@@ -1,0 +1,9 @@
+[package]
+name = "block_stored_too_late"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

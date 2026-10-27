@@ -1,0 +1,9 @@
+[package]
+name = "blocks_stored_wrong_output"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""
