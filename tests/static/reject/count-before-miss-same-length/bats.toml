@@ -1,0 +1,9 @@
+[package]
+name = "count_before_miss_same_length"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

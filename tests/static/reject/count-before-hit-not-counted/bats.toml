@@ -1,0 +1,9 @@
+[package]
+name = "count_before_hit_not_counted"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

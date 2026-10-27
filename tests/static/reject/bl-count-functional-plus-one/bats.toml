@@ -1,0 +1,9 @@
+[package]
+name = "bl_count_functional_plus_one"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

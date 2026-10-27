@@ -5,6 +5,7 @@
 #include "share/atspre_staload.hats"
 
 #use array as A
+#use file as F
 #use arith as AR
 #use result as R
 
@@ -469,6 +470,49 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
 #pub prfun bits_functional {source:$A.cells}{p,width,first_value,second_value:nat} (BITS(source, p, width, first_value), BITS(source, p, width, second_value)): [first_value == second_value] void
 #pub prfun hbits_functional {source:$A.cells}{p,width,first_code,second_code:nat} (HBITS(source, p, width, first_code), HBITS(source, p, width, second_code)): [first_code == second_code] void
 
+(* A bit of a byte has one value (keyword: bits) *)
+prfun _byte_bit_functional {byte,bit_index,first_bit,second_bit:nat} .<bit_index>.
+  (first: BYTE_BIT(byte, bit_index, first_bit), second: BYTE_BIT(byte, bit_index, second_bit)): [first_bit == second_bit] void =
+  case+ first of
+  | BYTE_BIT_here() => (case+ second of BYTE_BIT_here() => ())
+  | BYTE_BIT_there(first_rest) =>
+    (case+ second of BYTE_BIT_there(second_rest) => _byte_bit_functional(first_rest, second_rest))
+
+prfn _bit_functional {source:$A.cells}{p,first_bit,second_bit:nat}
+  (first: BIT(source, p, first_bit), second: BIT(source, p, second_bit)): [first_bit == second_bit] void =
+  (case+ first of
+   | BIT_mk(first_nth, first_byte_bit) =>
+     (case+ second of
+      | BIT_mk(second_nth, second_byte_bit) => let
+          prval () = $A.nth_functional(first_nth, second_nth)
+        in _byte_bit_functional(first_byte_bit, second_byte_bit) end))
+
+primplement bit_functional {source}{p,first_bit,second_bit} (first, second) = _bit_functional(first, second)
+
+prfun _bits_functional {source:$A.cells}{p,width,first_value,second_value:nat} .<width>.
+  (first: BITS(source, p, width, first_value), second: BITS(source, p, width, second_value)): [first_value == second_value] void =
+  case+ first of
+  | BITS_nil() => (case+ second of BITS_nil() => ())
+  | BITS_cons(first_bit, first_rest) =>
+    (case+ second of
+     | BITS_cons(second_bit, second_rest) => let
+         prval () = bit_functional(first_bit, second_bit)
+       in _bits_functional(first_rest, second_rest) end)
+
+primplement bits_functional {source}{p,width,first_value,second_value} (first, second) = _bits_functional(first, second)
+
+prfun _hbits_functional {source:$A.cells}{p,width,first_code,second_code:nat} .<width>.
+  (first: HBITS(source, p, width, first_code), second: HBITS(source, p, width, second_code)): [first_code == second_code] void =
+  case+ first of
+  | HBITS_nil() => (case+ second of HBITS_nil() => ())
+  | HBITS_snoc(first_rest, first_bit) =>
+    (case+ second of
+     | HBITS_snoc(second_rest, second_bit) => let
+         prval () = bit_functional(first_bit, second_bit)
+       in _hbits_functional(first_rest, second_rest) end)
+
+primplement hbits_functional {source}{p,width,first_code,second_code} (first, second) = _hbits_functional(first, second)
+
 (* Cells built from cells *)
 
 (* SLICE(source, start, width, part): the width cells from cell start are part *)
@@ -563,6 +607,175 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
 #pub prfun decsym_functional {lengths,source:$A.cells}{maxlen,p,first_sym,first_used,second_sym,second_used:nat}
   (LENGTHS_FIT(lengths, maxlen), DECSYM(lengths, source, p, first_sym, first_used), DECSYM(lengths, source, p, second_sym, second_used)): [first_sym == second_sym; first_used == second_used] void
 
+(* Proofs of the canonical code (keyword: huffman-code). The code of a symbol
+   is its length's first code and the number of earlier symbols of that
+   length; a code is a prefix of no longer code because each length's first
+   code is twice the end of the one before (3.2.2). *)
+
+prfun _clen_functional {cells:$A.cells}{first,second:nat} .<first>.
+  (first_len: $A.CLEN(cells, first), second_len: $A.CLEN(cells, second)): [first == second] void =
+  case+ first_len of
+  | $A.CLEN_nil() => (case+ second_len of $A.CLEN_nil() => ())
+  | $A.CLEN_cons(first_rest) => (case+ second_len of $A.CLEN_cons(second_rest) => _clen_functional(first_rest, second_rest))
+
+prfun _count_before_functional {lengths:$A.cells}{until:nat}{len:int}{first_count,second_count:nat} .<until>.
+  (first: COUNT_BEFORE(lengths, until, len, first_count), second: COUNT_BEFORE(lengths, until, len, second_count)): [first_count == second_count] void =
+  case+ first of
+  | COUNT_BEFORE_zero() => (case+ second of COUNT_BEFORE_zero() => ())
+  | COUNT_BEFORE_hit(first_rest) =>
+    (case+ second of
+     | COUNT_BEFORE_hit(second_rest) => _count_before_functional(first_rest, second_rest)
+     | COUNT_BEFORE_miss(_) => ())
+  | COUNT_BEFORE_miss(first_rest) =>
+    (case+ second of
+     | COUNT_BEFORE_hit(_) => ()
+     | COUNT_BEFORE_miss(second_rest) => _count_before_functional(first_rest, second_rest))
+
+prfn _bl_count_functional {lengths:$A.cells}{len,first_count,second_count:nat}
+  (first: BL_COUNT(lengths, len, first_count), second: BL_COUNT(lengths, len, second_count)): [first_count == second_count] void =
+  (case+ first of
+   | BL_COUNT_mk(first_len, first_before) =>
+     (case+ second of
+      | BL_COUNT_mk(second_len, second_before) => let
+          prval () = _clen_functional(first_len, second_len)
+        in _count_before_functional(first_before, second_before) end))
+
+primplement bl_count_functional {lengths}{len,first_count,second_count} (first, second) = _bl_count_functional(first, second)
+
+prfun _next_code_functional {lengths:$A.cells}{len,first_code,second_code:nat} .<len>.
+  (first: NEXT_CODE(lengths, len, first_code), second: NEXT_CODE(lengths, len, second_code)): [first_code == second_code] void =
+  case+ first of
+  | NEXT_CODE_first() => (case+ second of NEXT_CODE_first() => () | NEXT_CODE_next(_, _) => ())
+  | NEXT_CODE_next(first_rest, first_count) =>
+    (case+ second of
+     | NEXT_CODE_first() => ()
+     | NEXT_CODE_next(second_rest, second_count) => let
+         prval () = _next_code_functional(first_rest, second_rest)
+         prval () = bl_count_functional(first_count, second_count)
+       in () end)
+
+primplement next_code_functional {lengths}{len,first_code,second_code} (first, second) = _next_code_functional(first, second)
+
+primplement code_functional {lengths}{sym,first_code,first_len,second_code,second_len} (first, second) =
+  (case+ first of
+   | CODE_mk(first_nth, first_next, first_before) =>
+     (case+ second of
+      | CODE_mk(second_nth, second_next, second_before) => let
+          prval () = $A.nth_functional(first_nth, second_nth)
+          prval () = next_code_functional(first_next, second_next)
+          prval () = _count_before_functional(first_before, second_before)
+        in () end))
+
+(* A symbol of length len has fewer earlier symbols of its length than a later point has *)
+prfun _count_before_strict {lengths:$A.cells}{first_sym,second_sym:nat | first_sym < second_sym}{len:int}{first_rank,second_rank:nat} .<first_sym>.
+  (found: $A.NTH(lengths, first_sym, len), first: COUNT_BEFORE(lengths, first_sym, len, first_rank), second: COUNT_BEFORE(lengths, second_sym, len, second_rank))
+  : [first_rank < second_rank] void =
+  case+ found of
+  | $A.NTH_here() =>
+    (case+ first of
+     | COUNT_BEFORE_zero() =>
+       (case+ second of
+        | COUNT_BEFORE_hit(_) => ()
+        | COUNT_BEFORE_miss(_) => ()))
+  | $A.NTH_there(found_rest) =>
+    (case+ first of
+     | COUNT_BEFORE_hit(first_rest) =>
+       (case+ second of
+        | COUNT_BEFORE_hit(second_rest) => _count_before_strict(found_rest, first_rest, second_rest)
+        | COUNT_BEFORE_miss(_) => ())
+     | COUNT_BEFORE_miss(first_rest) =>
+       (case+ second of
+        | COUNT_BEFORE_hit(_) => ()
+        | COUNT_BEFORE_miss(second_rest) => _count_before_strict(found_rest, first_rest, second_rest)))
+
+(* The symbol's rank among the symbols of its length is below the length's count *)
+prfn _rank_below_count {lengths:$A.cells}{sym:nat}{len:int}{rank,total:nat}
+  (found: $A.NTH(lengths, sym, len), before: COUNT_BEFORE(lengths, sym, len, rank), count: BL_COUNT(lengths, len, total)): [rank < total] void =
+  case+ count of
+  | BL_COUNT_mk(count_len, count_before) => let
+      prval () = $A.nth_in_len(found, count_len)
+    in _count_before_strict(found, before, count_before) end
+
+dataprop _LEN_AT(cells: $A.cells, len: int, first_code: int, count: int) =
+  | {cells:$A.cells}{len,first_code,count:nat} _LEN_AT_mk(cells, len, first_code, count) of (NEXT_CODE(cells, len, first_code), BL_COUNT(cells, len, count))
+
+prfun _len_fit_at {lengths:$A.cells}{maxlen,len:nat | 1 <= len; len <= maxlen} .<maxlen>.
+  (fit: LEN_FIT(lengths, maxlen)): [first_code,count:nat] _LEN_AT(lengths, len, first_code, count) =
+  case+ fit of
+  | LEN_FIT_step(fit_rest, next_code, bl_count, _) =>
+    sif len == maxlen then _LEN_AT_mk(next_code, bl_count) else _len_fit_at(fit_rest)
+
+prfun _at_most_nth {lengths:$A.cells}{maxlen,index:nat}{value:int} .<index>.
+  (at_most: AT_MOST(lengths, maxlen), found: $A.NTH(lengths, index, value)): [0 <= value; value <= maxlen] void =
+  case+ found of
+  | $A.NTH_here() => (case+ at_most of AT_MOST_cons(_) => ())
+  | $A.NTH_there(found_rest) => (case+ at_most of AT_MOST_cons(at_most_rest) => _at_most_nth(at_most_rest, found_rest))
+
+(* A code of the shorter length is greater than the first bits of any longer code's first code (3.2.2: next_code[len + 1] = 2 * (next_code[len] + bl_count[len])) *)
+prfun _shorter_below {source,lengths:$A.cells}{p,short,long,short_code,long_value,short_first,short_count,long_first:nat | 1 <= short; short < long; short_code < short_first + short_count} .<long>.
+  (short_bits: HBITS(source, p, short, short_code), long_bits: HBITS(source, p, long, long_value),
+   short_next: NEXT_CODE(lengths, short, short_first), short_counted: BL_COUNT(lengths, short, short_count),
+   long_next: NEXT_CODE(lengths, long, long_first)): [long_value < long_first] void =
+  case+ long_bits of
+  | HBITS_snoc(long_rest, _) =>
+    (case+ long_next of
+     | NEXT_CODE_next(next_rest, count_rest) =>
+       sif long == short + 1 then let
+         prval () = hbits_functional(short_bits, long_rest)
+         prval () = next_code_functional(short_next, next_rest)
+         prval () = bl_count_functional(short_counted, count_rest)
+       in () end
+       else let
+         prval () = _shorter_below(short_bits, long_rest, short_next, short_counted, next_rest)
+       in () end)
+
+prfn _decsym_prefix {lengths,source:$A.cells}{maxlen,p,short_sym,short_used,long_sym,long_used:nat | short_used < long_used}
+  (at_most: AT_MOST(lengths, maxlen), fit: LEN_FIT(lengths, maxlen), short: DECSYM(lengths, source, p, short_sym, short_used), long: DECSYM(lengths, source, p, long_sym, long_used)): [false] void =
+  case+ short of
+  | DECSYM_mk(short_bits, short_code) =>
+    (case+ long of
+     | DECSYM_mk(long_bits, long_code) =>
+       (case+ short_code of
+        | CODE_mk(short_found, short_next, short_before) =>
+          (case+ long_code of
+           | CODE_mk(long_found, long_next, long_before) => let
+               prval () = _at_most_nth(at_most, short_found)
+               prval _LEN_AT_mk(fit_next, fit_count) = _len_fit_at{lengths}{maxlen,short_used}(fit)
+               prval () = _next_code_functional(short_next, fit_next)
+               prval () = _rank_below_count(short_found, short_before, fit_count)
+               prval () = _shorter_below(short_bits, long_bits, short_next, fit_count, long_next)
+             in () end)))
+
+primplement decsym_functional {lengths,source}{maxlen,p,first_sym,first_used,second_sym,second_used} (fit, first, second) =
+  (case+ fit of
+   | LENGTHS_FIT_mk(at_most, len_fit) =>
+     sif first_used < second_used then let
+       prval () = _decsym_prefix(at_most, len_fit, first, second)
+     in () end
+     else sif second_used < first_used then let
+       prval () = _decsym_prefix(at_most, len_fit, second, first)
+     in () end
+     else
+       (case+ first of
+        | DECSYM_mk(first_bits, first_code) =>
+          (case+ second of
+           | DECSYM_mk(second_bits, second_code) =>
+             (case+ first_code of
+              | CODE_mk(first_found, first_next, first_before) =>
+                (case+ second_code of
+                 | CODE_mk(second_found, second_next, second_before) => let
+                     prval () = hbits_functional(first_bits, second_bits)
+                     prval () = next_code_functional(first_next, second_next)
+                   in
+                     sif first_sym < second_sym then let
+                       prval () = _count_before_strict(first_found, first_before, second_before)
+                     in () end
+                     else sif second_sym < first_sym then let
+                       prval () = _count_before_strict(second_found, second_before, first_before)
+                     in () end
+                     else ()
+                   end)))))
+
 (* The alphabets of the compressed data, RFC 1951 3.2.5 and 3.2.6 *)
 
 (* What a literal/length symbol is *)
@@ -615,7 +828,7 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
 (* CL_ORDER(order): the order in which the code length code's lengths are
    stored: 16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15 *)
 #pub dataprop CL_ORDER($A.cells) =
-  | CL_ORDER_mk($A.ccons(16, $A.ccons(17, $A.ccons(18, $A.ccons(0, $A.ccons(8, $A.ccons(7, $A.ccons(9, $A.ccons(6, $A.ccons(10, $A.ccons(5, $A.ccons(11, $A.ccons(4, $A.ccons(12, $A.ccons(3, $A.ccons(13, $A.ccons(2, $A.ccons(14, $A.ccons(1, $A.ccons(15, $A.cnil())))))))))))))))))))))
+  | CL_ORDER_mk($A.ccons(16, $A.ccons(17, $A.ccons(18, $A.ccons(0, $A.ccons(8, $A.ccons(7, $A.ccons(9, $A.ccons(6, $A.ccons(10, $A.ccons(5, $A.ccons(11, $A.ccons(4, $A.ccons(12, $A.ccons(3, $A.ccons(13, $A.ccons(2, $A.ccons(14, $A.ccons(1, $A.ccons(15, $A.cnil()))))))))))))))))))))
 
 (* READ_LENGTHS3(source, p, count, values): count lengths of 3 bits each from bit p *)
 #pub dataprop READ_LENGTHS3($A.cells, int, int, $A.cells) =

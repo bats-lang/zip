@@ -1,0 +1,9 @@
+[package]
+name = "next_code_first_not_zero"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

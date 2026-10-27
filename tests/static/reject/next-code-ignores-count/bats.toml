@@ -1,0 +1,9 @@
+[package]
+name = "next_code_ignores_count"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

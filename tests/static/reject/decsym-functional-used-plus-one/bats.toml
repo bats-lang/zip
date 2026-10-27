@@ -1,0 +1,9 @@
+[package]
+name = "decsym_functional_used_plus_one"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "code_wrong_rank"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

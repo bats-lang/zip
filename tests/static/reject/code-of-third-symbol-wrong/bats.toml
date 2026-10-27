@@ -1,0 +1,9 @@
+[package]
+name = "code_of_third_symbol_wrong"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "decsym_functional_without_fit"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

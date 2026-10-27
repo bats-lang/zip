@@ -1,0 +1,3 @@
+function _hit_counts
+line 9
+unsolved constraint: C3NSTRprop(C3TKmain(); S2Eeqeq(S2Eapp(S2Ecst(add_int_int); S2Evar(count(13148)), S2Eintinf(1)); S2Evar(count(13148))))

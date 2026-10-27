@@ -1,0 +1,9 @@
+[package]
+name = "bits_functional_other_position"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""
