@@ -1,0 +1,9 @@
+[package]
+name = "slice_wrong_start"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

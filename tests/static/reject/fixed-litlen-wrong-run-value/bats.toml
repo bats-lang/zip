@@ -1,0 +1,9 @@
+[package]
+name = "fixed_litlen_wrong_run_value"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

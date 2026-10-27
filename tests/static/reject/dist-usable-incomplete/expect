@@ -1,0 +1,6 @@
+function _fit_only
+line 7
+the dynamic expression cannot be assigned the type [S2Eapp(S2Ecst(LENGTHS_EMPTY); S2Evar(lengths(13246)))].
+mismatch of static terms (tyleq):
+The actual term is: S2Eapp(S2Ecst(LENGTHS_FIT); S2Evar(lengths(13246)), S2Eintinf(15))
+The needed term is: S2Eapp(S2Ecst(LENGTHS_EMPTY); S2Evar(lengths(13246)))

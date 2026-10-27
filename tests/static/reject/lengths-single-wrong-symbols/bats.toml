@@ -1,0 +1,9 @@
+[package]
+name = "lengths_single_wrong_symbols"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

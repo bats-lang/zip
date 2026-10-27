@@ -1,0 +1,9 @@
+[package]
+name = "slice_wrong_cell"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

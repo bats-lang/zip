@@ -1,0 +1,9 @@
+[package]
+name = "lengths_single_two_ones"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

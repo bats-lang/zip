@@ -1,0 +1,9 @@
+[package]
+name = "lengths_full_incomplete"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""
