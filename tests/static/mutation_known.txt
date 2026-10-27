@@ -2,3 +2,4 @@
 # No entry: inflates_functional's two mutants (its second and its first output replaced by a fresh
 # variable) are both rejected, so no mutant of this package is accepted. A lemma whose conclusion is
 # `[false] void` would be listed here with a reject fixture beside it.
+src/lib.bats | _decsym_prefix | probe 1==2 | private lemma that concludes [false] void (a shorter code is a prefix of a longer one): a false conclusion has no false variant and 1 == 2 is equivalent to it. It is load-bearing in decsym_functional, whose two guard== mutants are rejected, and the reject fixtures decsym-functional-symbol-plus-one and decsym-functional-used-plus-one fail for the claim past what it proves.

@@ -1,0 +1,9 @@
+[package]
+name = "pow2_wrong_extra_bits"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

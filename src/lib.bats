@@ -467,7 +467,9 @@ implement cd_name_eq {l}{s}{no}{nl}{lb}{nb} (cd, no, nl, name, nb) =
     HBITS_snoc(source, p, width + 1, 2 * code + bit) of (HBITS(source, p, width, code), BIT(source, p + width, bit))
 
 #pub prfun bit_functional {source:$A.cells}{p,first_bit,second_bit:nat} (BIT(source, p, first_bit), BIT(source, p, second_bit)): [first_bit == second_bit] void
+
 #pub prfun bits_functional {source:$A.cells}{p,width,first_value,second_value:nat} (BITS(source, p, width, first_value), BITS(source, p, width, second_value)): [first_value == second_value] void
+
 #pub prfun hbits_functional {source:$A.cells}{p,width,first_code,second_code:nat} (HBITS(source, p, width, first_code), HBITS(source, p, width, second_code)): [first_code == second_code] void
 
 (* A bit of a byte has one value (keyword: bits) *)
@@ -478,7 +480,7 @@ prfun _byte_bit_functional {byte,bit_index,first_bit,second_bit:nat} .<bit_index
   | BYTE_BIT_there(first_rest) =>
     (case+ second of BYTE_BIT_there(second_rest) => _byte_bit_functional(first_rest, second_rest))
 
-prfn _bit_functional {source:$A.cells}{p,first_bit,second_bit:nat}
+prfun _bit_functional {source:$A.cells}{p,first_bit,second_bit:nat} .<>.
   (first: BIT(source, p, first_bit), second: BIT(source, p, second_bit)): [first_bit == second_bit] void =
   (case+ first of
    | BIT_mk(first_nth, first_byte_bit) =>
@@ -600,7 +602,9 @@ primplement hbits_functional {source}{p,width,first_code,second_code} (first, se
     DECSYM_mk(lengths, source, p, sym, used) of (HBITS(source, p, used, code), CODE(lengths, sym, code, used))
 
 #pub prfun bl_count_functional {lengths:$A.cells}{len,first_count,second_count:nat} (BL_COUNT(lengths, len, first_count), BL_COUNT(lengths, len, second_count)): [first_count == second_count] void
+
 #pub prfun next_code_functional {lengths:$A.cells}{len,first_code,second_code:nat} (NEXT_CODE(lengths, len, first_code), NEXT_CODE(lengths, len, second_code)): [first_code == second_code] void
+
 #pub prfun code_functional {lengths:$A.cells}{sym,first_code,first_len,second_code,second_len:nat}
   (CODE(lengths, sym, first_code, first_len), CODE(lengths, sym, second_code, second_len)): [first_code == second_code; first_len == second_len] void
 (* A bit sequence decodes to one symbol (the code is prefix-free) *)
@@ -631,7 +635,7 @@ prfun _count_before_functional {lengths:$A.cells}{until:nat}{len:int}{first_coun
      | COUNT_BEFORE_hit(_) => ()
      | COUNT_BEFORE_miss(second_rest) => _count_before_functional(first_rest, second_rest))
 
-prfn _bl_count_functional {lengths:$A.cells}{len,first_count,second_count:nat}
+prfun _bl_count_functional {lengths:$A.cells}{len,first_count,second_count:nat} .<>.
   (first: BL_COUNT(lengths, len, first_count), second: BL_COUNT(lengths, len, second_count)): [first_count == second_count] void =
   (case+ first of
    | BL_COUNT_mk(first_len, first_before) =>
@@ -689,7 +693,7 @@ prfun _count_before_strict {lengths:$A.cells}{first_sym,second_sym:nat | first_s
         | COUNT_BEFORE_miss(second_rest) => _count_before_strict(found_rest, first_rest, second_rest)))
 
 (* The symbol's rank among the symbols of its length is below the length's count *)
-prfn _rank_below_count {lengths:$A.cells}{sym:nat}{len:int}{rank,total:nat}
+prfun _rank_below_count {lengths:$A.cells}{sym:nat}{len:int}{rank,total:nat} .<>.
   (found: $A.NTH(lengths, sym, len), before: COUNT_BEFORE(lengths, sym, len, rank), count: BL_COUNT(lengths, len, total)): [rank < total] void =
   case+ count of
   | BL_COUNT_mk(count_len, count_before) => let
@@ -729,7 +733,7 @@ prfun _shorter_below {source,lengths:$A.cells}{p,short,long,short_code,long_valu
          prval () = _shorter_below(short_bits, long_rest, short_next, short_counted, next_rest)
        in () end)
 
-prfn _decsym_prefix {lengths,source:$A.cells}{maxlen,p,short_sym,short_used,long_sym,long_used:nat | short_used < long_used}
+prfun _decsym_prefix {lengths,source:$A.cells}{maxlen,p,short_sym,short_used,long_sym,long_used:nat | short_used < long_used} .<>.
   (at_most: AT_MOST(lengths, maxlen), fit: LEN_FIT(lengths, maxlen), short: DECSYM(lengths, source, p, short_sym, short_used), long: DECSYM(lengths, source, p, long_sym, long_used)): [false] void =
   case+ short of
   | DECSYM_mk(short_bits, short_code) =>
@@ -905,8 +909,78 @@ primplement decsym_functional {lengths,source}{maxlen,p,first_sym,first_used,sec
    3 to 258 *)
 #pub prfun distance_range {sym,extra_bits,base,value:nat}{source:$A.cells}{p:nat}
   (DISTANCE_SYMBOL(sym, extra_bits, base), BITS(source, p, extra_bits, value)): [1 <= base + value; base + value <= 32768] void
+
 #pub prfun length_range {sym,extra_bits,base,value:nat}{source:$A.cells}{p:nat}
   (LENGTH_SYMBOL(sym, extra_bits, base), BITS(source, p, extra_bits, value)): [3 <= base + value; base + value <= 258] void
+
+(* Proofs of the ranges (keyword: copy-range): the extra bits value is below 2 to
+   their number, and the table's bases are linear in that power *)
+
+prfun _pow2_positive {k,power:nat} .<k>. (pow: $AR.POW2(k, power)): [1 <= power] void =
+  case+ pow of
+  | $AR.POW2_zero() => ()
+  | $AR.POW2_succ(pow_rest) => _pow2_positive(pow_rest)
+
+prfun _pow2_monotone {small,large,small_power,large_power:nat | small <= large} .<large>.
+  (small_pow: $AR.POW2(small, small_power), large_pow: $AR.POW2(large, large_power)): [small_power <= large_power] void =
+  case+ large_pow of
+  | $AR.POW2_zero() => (case+ small_pow of $AR.POW2_zero() => ())
+  | $AR.POW2_succ(large_rest) =>
+    (case+ small_pow of
+     | $AR.POW2_zero() => _pow2_positive(large_rest)
+     | $AR.POW2_succ(small_rest) => _pow2_monotone(small_rest, large_rest))
+
+prfun _bits_below_power {source:$A.cells}{p,width,value,power:nat} .<width>.
+  (bits: BITS(source, p, width, value), pow: $AR.POW2(width, power)): [value < power] void =
+  case+ bits of
+  | BITS_nil() => (case+ pow of $AR.POW2_zero() => ())
+  | BITS_cons(_, bits_rest) => (case+ pow of $AR.POW2_succ(pow_rest) => _bits_below_power(bits_rest, pow_rest))
+
+prfn _pow2_thirty_two (): $AR.POW2(5, 32) =
+  $AR.POW2_succ($AR.POW2_succ($AR.POW2_succ($AR.POW2_succ($AR.POW2_succ($AR.POW2_zero())))))
+
+prfn _pow2_eight_thousand (): $AR.POW2(13, 8192) =
+  $AR.POW2_succ($AR.POW2_succ($AR.POW2_succ($AR.POW2_succ($AR.POW2_succ($AR.POW2_succ($AR.POW2_succ($AR.POW2_succ(
+  $AR.POW2_succ($AR.POW2_succ($AR.POW2_succ($AR.POW2_succ($AR.POW2_succ($AR.POW2_zero())))))))))))))
+
+prfun _distance_range {sym,extra_bits,base,value:nat}{source:$A.cells}{p:nat} .<>.
+  (symbol: DISTANCE_SYMBOL(sym, extra_bits, base), bits: BITS(source, p, extra_bits, value)): [1 <= base + value; base + value <= 32768] void =
+  case+ symbol of
+  | DISTANCE_SYMBOL_short() => (case+ bits of BITS_nil() => ())
+  | DISTANCE_SYMBOL_base_2_times(pow) => let
+      prval () = _bits_below_power(bits, pow)
+      prval () = _pow2_monotone(pow, _pow2_eight_thousand())
+    in () end
+  | DISTANCE_SYMBOL_base_3_times(pow) => let
+      prval () = _bits_below_power(bits, pow)
+      prval () = _pow2_monotone(pow, _pow2_eight_thousand())
+    in () end
+
+primplement distance_range {sym,extra_bits,base,value}{source}{p} (symbol, bits) = _distance_range(symbol, bits)
+
+prfun _length_range {sym,extra_bits,base,value:nat}{source:$A.cells}{p:nat} .<>.
+  (symbol: LENGTH_SYMBOL(sym, extra_bits, base), bits: BITS(source, p, extra_bits, value)): [3 <= base + value; base + value <= 258] void =
+  case+ symbol of
+  | LENGTH_SYMBOL_short() => (case+ bits of BITS_nil() => ())
+  | LENGTH_SYMBOL_base_4_times(pow) => let
+      prval () = _bits_below_power(bits, pow)
+      prval () = _pow2_monotone(pow, _pow2_thirty_two())
+    in () end
+  | LENGTH_SYMBOL_base_5_times(pow) => let
+      prval () = _bits_below_power(bits, pow)
+      prval () = _pow2_monotone(pow, _pow2_thirty_two())
+    in () end
+  | LENGTH_SYMBOL_base_6_times(pow) => let
+      prval () = _bits_below_power(bits, pow)
+      prval () = _pow2_monotone(pow, _pow2_thirty_two())
+    in () end
+  | LENGTH_SYMBOL_base_7_times(pow) => let
+      prval () = _bits_below_power(bits, pow)
+      prval () = _pow2_monotone(pow, _pow2_thirty_two())
+    in () end
+  | LENGTH_SYMBOL_last() => (case+ bits of BITS_nil() => ())
+
+primplement length_range {sym,extra_bits,base,value}{source}{p} (symbol, bits) = _length_range(symbol, bits)
 
 
 (* ============================================================
