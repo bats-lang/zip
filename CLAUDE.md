@@ -48,6 +48,30 @@ to other cells or claimed deflated, and the lemma used for other compressed
 cells, another method, or to conclude the outputs differ. The lemma is
 mutation-checked (next section).
 
+## RFC 1951 as relations: bits, the canonical code, the tables (bats-lang/zip#64; keywords: bits, huffman-code, copy-range)
+
+`BITS(cells, p, width, value)` reads data elements least significant bit first and
+`HBITS` Huffman codes most significant bit first (RFC 1951 3.1.1), both over `BIT`
+(bit `p` is bit `p mod 8` of cell `p div 8`, by `BYTE_BIT`'s halving); values are at most
+16 bits, so no type names 2 to the 32 (the solver is 32-bit). `CODE(lengths, sym, code,
+len)` is 3.2.2: `NEXT_CODE` (next_code[len + 1] = 2 * (next_code[len] + bl_count[len]))
+plus the rank among earlier symbols of the length (`COUNT_BEFORE`). `decsym_functional`
+(a bit sequence decodes to one symbol) is prefix-freeness: a code of a shorter length is
+below the first code of every longer length (`_shorter_below`, one bit at a time), and
+two symbols of one length differ in rank (`_count_before_strict`). It needs only
+`LENGTHS_FIT`'s bl_count and the lengths' bound, not that the code is not over-subscribed
+(that bounds the codes, it is not what prefix-freeness rests on). `distance_range` and
+`length_range` read the table rows (`LENGTH_SYMBOL`, `DISTANCE_SYMBOL`, one constructor for
+each multiplier, so every index term is linear): distance 1 to 32768, length 3 to 258
+(symbol 284 with 31 reaches 258; `SYMS_copy` refuses it, as the RFC has it).
+Proved here, no `praxi`. Checked by the gmp solver; every lemma, private ones included, has
+mutants rejected (`mutation_check.py`: 73 rejected, `_decsym_prefix` listed in
+`tests/static/mutation_known.txt`), and `tests/static/reject` has a fixture for each
+relation's constructors and each lemma (shifted claims, the table's rows, the RFC's
+lengths 1, 2, 2 example in `accept/huffman-code-use`). The relations after these (blocks, the
+dynamic header, the window, the decoders) are declared in `design/rfc1951-declarations.txt`
+and are added with their proofs in the order of zip#64.
+
 ## The lemmas are mutation-checked under the infinite-precision solver (bats-lang/quire#594)
 
 The 32-bit solver can make a proof's context contradictory, so a lemma proves
