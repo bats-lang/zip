@@ -1,0 +1,12 @@
+[package]
+name = "inflate"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"file" = ""
+"result" = ""
+"str" = ""
+"sha256" = ""
+"zip" = ""

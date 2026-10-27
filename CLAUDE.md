@@ -117,6 +117,26 @@ only known when read, so `make_code` decides their fit while it builds the table
 `reader-fate-*`; every lemma has false variants (the four accepted mutants are weaker true statements
 or free variables, in `tests/static/mutation_known.txt`).
 
+## The decoders against zlib (bats-lang/zip#64; keyword: inflate-zlib)
+
+`tests/dynamic/inflate` (valgrind, no leaks) inflates every stream of `data/` through the four decoders
+(`inflate_stored_proved`, `inflate_proved`, `inflate_stored_cells_proved`, `inflate_cells_proved`) and compares
+the size and the sha256 of the output with zlib's. `data/NN.deflate` is a raw deflate stream and `data/NN.expect` is
+`s|o`, zlib's sha256 and its size: `s` when every block is stored (the stored decoders must take it), `o` otherwise
+(they must refuse it as malformed). The streams are zlib's (levels 0 to 9, `Z_FIXED`, `Z_FILTERED`, `Z_HUFFMAN_ONLY`,
+`Z_RLE`, the 32 deflated entries of the three EPUBs in bats-lang/quire) and hand-made fixed-code streams (a copy of
+length 258 at distance 1, distance 32768 and the first and last distance of every distance symbol, every length 3 to
+258, a copy that overlaps itself, a copy right before the end of the block, blocks of different kinds in one stream).
+`refuse/NN.deflate` are streams every decoder refuses (BTYPE 3, a LEN whose NLEN is not its complement, a stream that
+ends inside a block or has no final block, a copy from before the start, distance symbol 30, a dynamic header with HLIT
+30 and one with an over-subscribed code length code): the answer is the malformed constructor of each form, and
+`refuse/NN.expect` the fate of the reader for the stored and the full decoder (`c` closed before its end, `e` ended); the
+writer's file is closed in each. An empty stream cannot be given to the in-memory forms (a barr has at least one byte).
+`tests/dynamic/inflate/generate.py` makes both directories (zlib is the reference, used as it is: bats has no deflate
+compressor, and a decoder tested on streams of its own making would test nothing about RFC 1951); its expectations are
+zlib's own output and it checks that zlib refuses each refusal stream. The test counts the kind of each stream's first
+block and fails when a kind has none.
+
 ## The lemmas are mutation-checked under the infinite-precision solver (bats-lang/quire#594)
 
 The 32-bit solver can make a proof's context contradictory, so a lemma proves
