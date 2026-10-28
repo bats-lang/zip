@@ -1,0 +1,9 @@
+[package]
+name = "window_in_buffer_start"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "block_functional_end_plus_one"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

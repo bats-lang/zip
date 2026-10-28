@@ -1,0 +1,9 @@
+[package]
+name = "syms-copy-control"
+kind = "lib"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

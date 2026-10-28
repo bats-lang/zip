@@ -1,0 +1,9 @@
+[package]
+name = "decsym_code_of_other_bits"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

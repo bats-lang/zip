@@ -1,0 +1,9 @@
+[package]
+name = "block_dynamic_split_order"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

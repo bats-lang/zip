@@ -1,0 +1,9 @@
+[package]
+name = "window_append_other_next"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

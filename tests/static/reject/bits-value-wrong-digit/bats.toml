@@ -1,0 +1,9 @@
+[package]
+name = "bits_value_wrong_digit"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

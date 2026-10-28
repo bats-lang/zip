@@ -1,0 +1,9 @@
+[package]
+name = "syms_copy_length_bits_position"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

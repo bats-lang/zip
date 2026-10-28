@@ -1,0 +1,9 @@
+[package]
+name = "blocks_functional_other_before"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

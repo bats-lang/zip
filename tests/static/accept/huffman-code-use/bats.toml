@@ -1,0 +1,9 @@
+[package]
+name = "huffman-code-use"
+kind = "lib"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "bits_wider_than_16"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

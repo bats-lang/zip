@@ -1,0 +1,9 @@
+[package]
+name = "fixed_litlen_last_run_ends"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

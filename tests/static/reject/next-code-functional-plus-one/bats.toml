@@ -1,0 +1,9 @@
+[package]
+name = "next_code_functional_plus_one"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

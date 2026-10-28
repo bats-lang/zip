@@ -1,0 +1,10 @@
+[package]
+name = "reader_fate_ended_other_range"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"file" = ""
+"result" = ""
+"zip" = ""

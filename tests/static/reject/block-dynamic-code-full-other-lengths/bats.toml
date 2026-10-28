@@ -1,0 +1,9 @@
+[package]
+name = "block_dynamic_code_full_other_lengths"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

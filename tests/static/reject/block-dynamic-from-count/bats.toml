@@ -1,0 +1,9 @@
+[package]
+name = "block_dynamic_from_count"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

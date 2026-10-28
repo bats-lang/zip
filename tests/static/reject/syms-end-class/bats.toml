@@ -1,0 +1,9 @@
+[package]
+name = "syms_end_class"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

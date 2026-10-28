@@ -1,0 +1,9 @@
+[package]
+name = "blocks_next_final_bit_one"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

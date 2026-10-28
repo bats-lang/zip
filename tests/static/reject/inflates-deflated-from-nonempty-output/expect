@@ -1,0 +1,9 @@
+function _from_output
+line 8
+the dynamic expression cannot be assigned the type [S2Eapp(S2Ecst(BLOCKS); S2EVar(9100), S2Eintinf(0), S2Eapp(S2Ecst(cnil); ), S2EVar(9101))].
+mismatch of static terms (equal):
+The actual term is: S2Eapp(S2Ecst(ccons); S2Eintinf(1), S2Eapp(S2Ecst(cnil); ))
+The needed term is: S2Eapp(S2Ecst(cnil); )
+mismatch of static terms (tyleq):
+The actual term is: S2Eapp(S2Ecst(BLOCKS); S2Evar(compressed(13560)), S2Eintinf(0), S2Eapp(S2Ecst(ccons); S2Eintinf(1), S2Eapp(S2Ecst(cnil); )), S2Evar(output(13561)))
+The needed term is: S2Eapp(S2Ecst(BLOCKS); S2EVar(9100->S2Evar(compressed(13560))), S2Eintinf(0), S2Eapp(S2Ecst(cnil); ), S2EVar(9101->S2Evar(output(13561))))

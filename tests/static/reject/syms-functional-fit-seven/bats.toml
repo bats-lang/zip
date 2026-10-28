@@ -1,0 +1,9 @@
+[package]
+name = "syms_functional_fit_seven"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

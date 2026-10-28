@@ -1,0 +1,9 @@
+[package]
+name = "length_class_short_zeros_eighteen"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "lengths_full_over_subscribed"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "buffer_at_consumed_order"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

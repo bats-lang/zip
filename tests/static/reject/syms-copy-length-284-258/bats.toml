@@ -1,0 +1,9 @@
+[package]
+name = "syms_copy_length_284_258"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "length_fit_over_maxlen"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

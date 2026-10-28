@@ -1,0 +1,9 @@
+[package]
+name = "litlen_usable_fit_only_seven"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

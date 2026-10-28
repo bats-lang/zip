@@ -1,0 +1,9 @@
+[package]
+name = "inflate_cells_output_other_cells"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

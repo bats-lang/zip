@@ -1,0 +1,3 @@
+function _fact
+line 18
+unsolved constraint: C3NSTRprop(C3TKmain(); S2Eeqeq(S2Eapp(S2Ecst(sub_int_int); S2Eapp(S2Ecst(add_int_int); S2Eapp(S2Ecst(add_int_int); S2Eapp(S2Ecst(add_int_int); S2Eapp(S2Ecst(add_int_int); S2Evar(p(14199)), S2Evar(used(14201))), S2Evar(length_extra_bits(14202))), S2Evar(dist_used(14206))), S2Evar(dist_extra_bits(14207))), S2Eintinf(1)); S2Eapp(S2Ecst(add_int_int); S2Eapp(S2Ecst(add_int_int); S2Eapp(S2Ecst(add_int_int); S2Eapp(S2Ecst(add_int_int); S2Evar(p(14199)), S2Evar(used(14201))), S2Evar(length_extra_bits(14202))), S2Evar(dist_used(14206))), S2Evar(dist_extra_bits(14207)))))

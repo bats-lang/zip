@@ -1,0 +1,9 @@
+[package]
+name = "code_lengths_functional_fit_fifteen"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

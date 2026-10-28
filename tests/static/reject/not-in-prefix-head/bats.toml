@@ -1,0 +1,9 @@
+[package]
+name = "not_in_prefix_head"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

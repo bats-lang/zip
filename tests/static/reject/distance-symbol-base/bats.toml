@@ -1,0 +1,9 @@
+[package]
+name = "distance_symbol_base"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

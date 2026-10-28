@@ -1,0 +1,3 @@
+function _fact
+line 17
+unsolved constraint: C3NSTRprop(C3TKmain(); S2Eeqeq(S2Eapp(S2Ecst(sub_int_int); S2Evar(so_far_count(15189)), S2Eintinf(2)); S2Eapp(S2Ecst(sub_int_int); S2Evar(so_far_count(15189)), S2Eintinf(1))))

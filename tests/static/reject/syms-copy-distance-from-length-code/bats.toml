@@ -1,0 +1,9 @@
+[package]
+name = "syms_copy_distance_from_length_code"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "reservoir_other_value"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

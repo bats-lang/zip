@@ -1,0 +1,13 @@
+00 no bytes
+01 a final stored block header and nothing after it
+02 BTYPE 3 (reserved), final
+03 BTYPE 3 (reserved), not final
+04 a stored block whose NLEN is not the complement of LEN
+05 a stored block that ends inside its data
+06 a stored block that is not final, and no block after it
+07 a fixed block cut in the middle
+08 a dynamic block cut in the middle
+09 a fixed block with a copy from before the start of the output
+10 a fixed block with distance symbol 30
+11 a dynamic block with HLIT 30 (more than 286 literal/length codes)
+12 a dynamic block whose code length code is over-subscribed (four codes of one bit)

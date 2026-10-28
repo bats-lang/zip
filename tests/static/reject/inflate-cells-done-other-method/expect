@@ -1,0 +1,12 @@
+function _stored
+line 10
+the pattern cannot be given the ascribed type.
+mismatch of static terms (equal):
+The actual term is: S2Eapp(S2Ecst(inflate_deflated); )
+The needed term is: S2Eapp(S2Ecst(inflate_stored); )
+mismatch of static terms (tyleq):
+The actual term is: S2Eapp(S2Ecst(INFLATES); S2Eapp(S2Ecst(inflate_deflated); ), S2Evar(compressed(18956)), S2Evar(output$9144(18958)))
+The needed term is: S2Eapp(S2Ecst(INFLATES); S2Eapp(S2Ecst(inflate_stored); ), S2Evar(compressed(18956)), S2EVar(18606->S2Evar(output$9144(18958))))
+mismatch of static terms (tyleq):
+The actual term is: S2Eapp(S2Ecst(INFLATES); S2Eapp(S2Ecst(inflate_deflated); ), S2Evar(compressed(18956)), S2Evar(output$9144(18958)))
+The needed term is: S2Eexi(kept(18961); ; S2Eapp(S2Ecst(INFLATES); S2Eapp(S2Ecst(inflate_stored); ), S2Evar(compressed(18956)), S2Evar(kept(18961))))

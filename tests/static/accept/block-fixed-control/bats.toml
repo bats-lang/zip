@@ -1,0 +1,9 @@
+[package]
+name = "block-fixed-control"
+kind = "lib"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

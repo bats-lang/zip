@@ -1,0 +1,9 @@
+[package]
+name = "bits_functional_other_width"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

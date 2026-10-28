@@ -1,0 +1,9 @@
+[package]
+name = "symbol-tables-use"
+kind = "lib"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "take-last-use"
+kind = "lib"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

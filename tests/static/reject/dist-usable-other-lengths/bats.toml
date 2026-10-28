@@ -1,0 +1,9 @@
+[package]
+name = "dist_usable_other_lengths"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

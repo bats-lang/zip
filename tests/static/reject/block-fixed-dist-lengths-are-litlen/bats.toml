@@ -1,0 +1,9 @@
+[package]
+name = "block_fixed_dist_lengths_are_litlen"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

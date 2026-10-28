@@ -1,0 +1,9 @@
+[package]
+name = "bits_lsb_first"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

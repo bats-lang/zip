@@ -1,0 +1,9 @@
+[package]
+name = "length-class-use"
+kind = "lib"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "buffer_nth_index_without_start"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

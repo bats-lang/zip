@@ -1,0 +1,10 @@
+[package]
+name = "inflated_done_file_holds_other_output"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"file" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,63 @@
+00 zlib level 0, 0 pseudo-random bytes (stored blocks)
+01 zlib level 0, 1 pseudo-random bytes (stored blocks)
+02 zlib level 0, 65535 pseudo-random bytes (stored blocks)
+03 zlib level 0, 65536 pseudo-random bytes (stored blocks)
+04 zlib level 0, 200000 pseudo-random bytes (stored blocks)
+05 zlib Z_FIXED, 5000 bytes of text
+06 zlib Z_FIXED, 1000 pseudo-random bytes (9 bit literals)
+07 zlib Z_FIXED, 300 times a (length 258, distance 1)
+08 zlib Z_FIXED, no input (the end of block alone)
+09 hand-made fixed: a, then a copy of length 258 distance 1, end of block right after the copy
+10 hand-made fixed: 32768 literals, then a copy of distance 32768
+11 hand-made fixed: ab, then a copy of length 10 distance 2 (overlaps itself)
+12 hand-made fixed: xyz, a copy of length 3 distance 3, end of block
+13 hand-made fixed: a, then a copy of each length 3 to 258 at distance 1
+14 hand-made fixed: 32768 literals, then copies at the first and last distance of each distance symbol
+15 hand-made: a fixed block, then a fixed block that copies from the first
+16 hand-made: a fixed block, a stored block, a fixed block that copies from the first
+17 zlib level 1, 60000 bytes of text
+18 zlib level 2, 60000 bytes of text
+19 zlib level 3, 60000 bytes of text
+20 zlib level 4, 60000 bytes of text
+21 zlib level 5, 60000 bytes of text
+22 zlib level 6, 60000 bytes of text
+23 zlib level 7, 60000 bytes of text
+24 zlib level 8, 60000 bytes of text
+25 zlib level 9, 60000 bytes of text
+26 zlib Z_FILTERED level 6, text
+27 zlib Z_HUFFMAN_ONLY, text (no copies)
+28 zlib Z_RLE, text
+29 zlib level 9, 100000 times a (a single distance code)
+30 zlib level 6, pseudo-random bytes (stored blocks in a compressed stream)
+31 calculus101-mathml-test.epub META-INF/container.xml (246 bytes)
+32 calculus101-mathml-test.epub content.opf (2144 bytes)
+33 calculus101-mathml-test.epub toc.ncx (552 bytes)
+34 calculus101-mathml-test.epub genindex.xhtml (807 bytes)
+35 calculus101-mathml-test.epub index.xhtml (11137 bytes)
+36 calculus101-mathml-test.epub _static/basic.css (14685 bytes)
+37 calculus101-mathml-test.epub _static/epub.css (12204 bytes)
+38 calculus101-mathml-test.epub _static/file.png (286 bytes)
+39 calculus101-mathml-test.epub _static/minus.png (90 bytes)
+40 calculus101-mathml-test.epub _static/plus.png (90 bytes)
+41 calculus101-mathml-test.epub _static/pygments.css (533 bytes)
+42 calculus101-mathml-test.epub _static/sphinx-typst-math.css (2160 bytes)
+43 calculus101-mathml-test.epub nav.xhtml (423 bytes)
+44 conan-stories.epub META-INF/container.xml (252 bytes)
+45 conan-stories.epub OEBPS/pgepub.css (987 bytes)
+46 conan-stories.epub OEBPS/0.css (1535 bytes)
+47 conan-stories.epub OEBPS/1.css (2481 bytes)
+48 conan-stories.epub OEBPS/2919505986938560309_42664-h-0.htm.xhtml (21138 bytes)
+49 conan-stories.epub OEBPS/2919505986938560309_42664-h-1.htm.xhtml (20279 bytes)
+50 conan-stories.epub OEBPS/toc.xhtml (930 bytes)
+51 conan-stories.epub OEBPS/toc.ncx (956 bytes)
+52 conan-stories.epub OEBPS/wrap0000.xhtml (549 bytes)
+53 conan-stories.epub OEBPS/content.opf (2725 bytes)
+54 strikerville-he.epub META-INF/container.xml (252 bytes)
+55 strikerville-he.epub META-INF/com.apple.ibooks.display-options.xml (161 bytes)
+56 strikerville-he.epub EPUB/content.opf (2620 bytes)
+57 strikerville-he.epub EPUB/toc.ncx (971 bytes)
+58 strikerville-he.epub EPUB/nav.xhtml (978 bytes)
+59 strikerville-he.epub EPUB/text/title_page.xhtml (828 bytes)
+60 strikerville-he.epub EPUB/styles/stylesheet1.css (1253 bytes)
+61 strikerville-he.epub EPUB/text/ch001.xhtml (40596 bytes)
+62 strikerville-he.epub EPUB/text/ch002.xhtml (5548 bytes)

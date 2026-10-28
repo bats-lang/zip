@@ -1,0 +1,9 @@
+[package]
+name = "block_stored_end_bit"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

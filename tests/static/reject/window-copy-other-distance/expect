@@ -1,0 +1,3 @@
+function _other_distance
+line 9
+unsolved constraint: C3NSTRprop(C3TKmain(); S2Eeqeq(S2Evar(distance(15681)); S2Eapp(S2Ecst(add_int_int); S2Evar(distance(15681)), S2Eintinf(1))))

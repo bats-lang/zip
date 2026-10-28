@@ -1,0 +1,9 @@
+[package]
+name = "block_stored_nlen_not_complement"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

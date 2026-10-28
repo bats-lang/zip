@@ -1,0 +1,9 @@
+[package]
+name = "length_class_repeat_seventeen"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

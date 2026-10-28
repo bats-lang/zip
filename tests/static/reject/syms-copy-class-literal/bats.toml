@@ -1,0 +1,9 @@
+[package]
+name = "syms_copy_class_literal"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "cl_order_swapped"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "syms_end_output_changes"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

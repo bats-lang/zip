@@ -1,0 +1,9 @@
+[package]
+name = "lengths_empty_one_used"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

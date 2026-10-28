@@ -1,0 +1,9 @@
+[package]
+name = "read_lengths3_functional_distinct"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

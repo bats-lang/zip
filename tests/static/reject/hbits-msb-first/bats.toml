@@ -1,0 +1,9 @@
+[package]
+name = "hbits_msb_first"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

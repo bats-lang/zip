@@ -1,0 +1,10 @@
+#include "share/atspre_staload.hats"
+#use array as A
+#use arith as AR
+#use zip as Z
+
+(* Two lengths are two reads of three bits: a count of 3 with two reads is refused *)
+prfn _count (): $Z.READ_LENGTHS3($A.ccons(45, $A.ccons(0, $A.cnil())), 0, 3, $A.ccons(5, $A.ccons(5, $A.cnil()))) =
+  $Z.READ_LENGTHS3_cons{$A.ccons(45, $A.ccons(0, $A.cnil()))}{0, 1, 5}{$A.ccons(5, $A.cnil())}($Z.BITS_cons{$A.ccons(45, $A.ccons(0, $A.cnil()))}{0, 2, 2, 1}($Z.BIT_mk{$A.ccons(45, $A.ccons(0, $A.cnil()))}{0, 0, 0, 45, 1}($A.NTH_here(), $Z.BYTE_BIT_here{22}{1}()), $Z.BITS_cons{$A.ccons(45, $A.ccons(0, $A.cnil()))}{1, 1, 1, 0}($Z.BIT_mk{$A.ccons(45, $A.ccons(0, $A.cnil()))}{1, 0, 1, 45, 0}($A.NTH_here(), $Z.BYTE_BIT_there{22, 0}{0, 1}($Z.BYTE_BIT_here{11}{0}())), $Z.BITS_cons{$A.ccons(45, $A.ccons(0, $A.cnil()))}{2, 0, 0, 1}($Z.BIT_mk{$A.ccons(45, $A.ccons(0, $A.cnil()))}{2, 0, 2, 45, 1}($A.NTH_here(), $Z.BYTE_BIT_there{22, 1}{1, 1}($Z.BYTE_BIT_there{11, 0}{1, 0}($Z.BYTE_BIT_here{5}{1}()))), $Z.BITS_nil{$A.ccons(45, $A.ccons(0, $A.cnil()))}{3}()))), $Z.READ_LENGTHS3_cons{$A.ccons(45, $A.ccons(0, $A.cnil()))}{3, 0, 5}{$A.cnil()}($Z.BITS_cons{$A.ccons(45, $A.ccons(0, $A.cnil()))}{3, 2, 2, 1}($Z.BIT_mk{$A.ccons(45, $A.ccons(0, $A.cnil()))}{3, 0, 3, 45, 1}($A.NTH_here(), $Z.BYTE_BIT_there{22, 2}{1, 1}($Z.BYTE_BIT_there{11, 1}{1, 0}($Z.BYTE_BIT_there{5, 0}{1, 1}($Z.BYTE_BIT_here{2}{1}())))), $Z.BITS_cons{$A.ccons(45, $A.ccons(0, $A.cnil()))}{4, 1, 1, 0}($Z.BIT_mk{$A.ccons(45, $A.ccons(0, $A.cnil()))}{4, 0, 4, 45, 0}($A.NTH_here(), $Z.BYTE_BIT_there{22, 3}{0, 1}($Z.BYTE_BIT_there{11, 2}{0, 0}($Z.BYTE_BIT_there{5, 1}{0, 1}($Z.BYTE_BIT_there{2, 0}{0, 1}($Z.BYTE_BIT_here{1}{0}()))))), $Z.BITS_cons{$A.ccons(45, $A.ccons(0, $A.cnil()))}{5, 0, 0, 1}($Z.BIT_mk{$A.ccons(45, $A.ccons(0, $A.cnil()))}{5, 0, 5, 45, 1}($A.NTH_here(), $Z.BYTE_BIT_there{22, 4}{1, 1}($Z.BYTE_BIT_there{11, 3}{1, 0}($Z.BYTE_BIT_there{5, 2}{1, 1}($Z.BYTE_BIT_there{2, 1}{1, 1}($Z.BYTE_BIT_there{1, 0}{1, 0}($Z.BYTE_BIT_here{0}{1}())))))), $Z.BITS_nil{$A.ccons(45, $A.ccons(0, $A.cnil()))}{6}()))), $Z.READ_LENGTHS3_nil{$A.ccons(45, $A.ccons(0, $A.cnil()))}{6}()))
+
+implement main0 () = ()

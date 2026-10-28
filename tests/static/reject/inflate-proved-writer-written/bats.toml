@@ -1,0 +1,10 @@
+[package]
+name = "inflate_proved_writer_written"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"file" = ""
+"result" = ""
+"zip" = ""

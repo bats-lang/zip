@@ -1,0 +1,9 @@
+[package]
+name = "code_longer_than_15"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

@@ -1,0 +1,9 @@
+[package]
+name = "window_copy_other_distance"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

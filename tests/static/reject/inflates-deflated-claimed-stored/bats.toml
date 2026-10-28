@@ -1,0 +1,9 @@
+[package]
+name = "inflates_deflated_claimed_stored"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

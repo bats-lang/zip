@@ -1,0 +1,9 @@
+[package]
+name = "block_dynamic_litlen_of_dist"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

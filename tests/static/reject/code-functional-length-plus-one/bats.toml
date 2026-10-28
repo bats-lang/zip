@@ -1,0 +1,9 @@
+[package]
+name = "code_functional_length_plus_one"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

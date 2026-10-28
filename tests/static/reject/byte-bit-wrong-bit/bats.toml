@@ -1,0 +1,9 @@
+[package]
+name = "byte_bit_wrong_bit"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

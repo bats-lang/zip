@@ -1,0 +1,9 @@
+[package]
+name = "bit_functional_plus_one"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

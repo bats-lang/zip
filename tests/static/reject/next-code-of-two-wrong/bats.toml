@@ -1,0 +1,9 @@
+[package]
+name = "next_code_of_two_wrong"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

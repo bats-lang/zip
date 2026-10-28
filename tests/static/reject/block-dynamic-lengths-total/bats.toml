@@ -1,0 +1,9 @@
+[package]
+name = "block_dynamic_lengths_total"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""

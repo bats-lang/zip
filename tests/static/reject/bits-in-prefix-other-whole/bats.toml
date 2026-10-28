@@ -1,0 +1,9 @@
+[package]
+name = "bits_in_prefix_other_whole"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""
