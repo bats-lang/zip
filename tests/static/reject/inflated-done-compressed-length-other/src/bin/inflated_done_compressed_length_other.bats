@@ -2,7 +2,7 @@
 #use array as A
 #use arith as AR
 #use file as F
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 #target native begin
 
 (* the compressed cells have as many bytes as the range *)

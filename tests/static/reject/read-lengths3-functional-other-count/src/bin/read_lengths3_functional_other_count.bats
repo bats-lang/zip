@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* Both must read the same number of lengths *)
 prfn _other_count {source:$A.cells}{p,count:nat}{first,second:$A.cells}

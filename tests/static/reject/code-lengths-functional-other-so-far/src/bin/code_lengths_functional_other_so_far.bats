@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* Both decodings must start from the same lengths so far *)
 prfn _other_so_far {code_length_code,source:$A.cells}{p,total:nat}{so_far,other,first,second:$A.cells}{first_end,second_end:nat}

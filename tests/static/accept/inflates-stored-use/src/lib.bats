@@ -1,6 +1,6 @@
 #include "share/atspre_staload.hats"
 #use array as A
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* A stored entry inflates to its own cells, and two proofs of one entry give the same cells *)
 prfn _stored {cs:$A.cells} (): $Z.INFLATES($Z.inflate_stored(), cs, cs) = $Z.INFLATES_stored()

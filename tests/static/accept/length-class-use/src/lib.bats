@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The code length symbols 0 to 15 are lengths, 16 repeats, 17 and 18 are runs of zeros *)
 prfn _fifteen (): $Z.LENGTH_CLASS($Z.length_literal(), 15) = $Z.LENGTH_CLASS_literal()

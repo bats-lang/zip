@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The blocks after a non-final block start where it ends: another bit is refused *)
 prfn _other_bit {source:$A.cells}{p,btype,end_bit:nat}{before,middle,after:$A.cells}

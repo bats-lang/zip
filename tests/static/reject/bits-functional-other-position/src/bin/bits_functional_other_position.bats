@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The lemma needs both BITS from one bit position *)
 prfn _other_position {source:$A.cells}{p,width,first_value,second_value:nat}

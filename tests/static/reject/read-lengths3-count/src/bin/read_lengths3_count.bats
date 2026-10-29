@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* Two lengths are two reads of three bits: a count of 3 with two reads is refused *)
 prfn _count (): $Z.READ_LENGTHS3($A.ccons(45, $A.ccons(0, $A.cnil())), 0, 3, $A.ccons(5, $A.ccons(5, $A.cnil()))) =

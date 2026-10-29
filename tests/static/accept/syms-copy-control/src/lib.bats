@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The copy symbols of the rejects with every fact right are accepted: a length symbol, its extra bits, a distance symbol, its extra bits and the copy *)
 prfn _control {litlen,dist,source,output,next,after:$A.cells}{p,sym,used,length_extra_bits,length_base,length_extra_value,dist_sym,dist_used,dist_extra_bits,dist_base,dist_extra_value,end_bit:nat | sym == 285 || length_base + length_extra_value <= 257}

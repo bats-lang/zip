@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* A copy gives one set of cells; the lemma does not make two differ *)
 prfn _distinct {output:$A.cells}{distance,length:nat}{first,second:$A.cells}

@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* Cells 1 and 2 of 5, 6, 7 are 6, 7 and not 6, 8 *)
 prfn _wrong_cell (): $Z.SLICE($A.ccons(5, $A.ccons(6, $A.ccons(7, $A.cnil()))), 1, 2, $A.ccons(6, $A.ccons(8, $A.cnil()))) =

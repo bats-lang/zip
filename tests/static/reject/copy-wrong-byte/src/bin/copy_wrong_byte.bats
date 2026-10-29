@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* Copying 2 bytes from distance 2 over 1, 2 gives 1, 2, 1, 2: the second copied byte is 2, not 3 *)
 prfn _wrong_byte (): $Z.COPY($A.ccons(1, $A.ccons(2, $A.cnil())), 2, 2, $A.ccons(1, $A.ccons(2, $A.ccons(1, $A.ccons(3, $A.cnil()))))) =

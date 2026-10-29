@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* HBITS has one code; the lemma does not give it one more *)
 prfn _plus_one {source:$A.cells}{p,width,first_code,second_code:nat}

@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The 7-bit run is third (256 to 279): in second place it is refused *)
 prfn _misordered {lengths,after_144,after_112,after_24:$A.cells}

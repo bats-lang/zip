@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* RFC 1951 3.2.5: a copy reads bytes it has just written when the distance is below the length; the copy is one set of cells *)
 prfn _overlapping (): $Z.COPY($A.ccons(1, $A.ccons(2, $A.cnil())), 2, 4, $A.ccons(1, $A.ccons(2, $A.ccons(1, $A.ccons(2, $A.ccons(1, $A.ccons(2, $A.cnil()))))))) =

@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The code length code lengths are one set of cells; the lemma does not make two differ *)
 prfn _distinct {order,values:$A.cells}{count,first_sym:nat | first_sym <= 19}{first,second:$A.cells}

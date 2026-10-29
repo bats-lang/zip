@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* Bits read from the first chunk are bits of the whole consumed sequence; the buffer's cell is a cell of the consumed cells; the reservoir is bits of them *)
 prfn _in_prefix {earlier,later,whole:$A.cells}{p,width,value:nat}

@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* A symbol has one code length; the lemma does not give it one more *)
 prfn _plus_one {lengths:$A.cells}{sym,first_code,first_len,second_code,second_len:nat}

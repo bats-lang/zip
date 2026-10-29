@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The lemma needs the order to be CL_ORDER: another order is refused (it has repeated symbols the lemma cannot exclude) *)
 prfn _other_order {order,other,values:$A.cells}{count,first_sym:nat | first_sym <= 19}{first,second:$A.cells}

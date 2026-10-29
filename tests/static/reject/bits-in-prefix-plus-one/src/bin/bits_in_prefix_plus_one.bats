@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The bits read from the earlier cells are the same value in the whole; the lemma does not give it one more *)
 prfn _plus_one {earlier,later,whole:$A.cells}{p,width,value:nat}

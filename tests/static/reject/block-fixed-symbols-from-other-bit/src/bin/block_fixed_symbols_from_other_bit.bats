@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The symbols of a block start at the first bit of its body: p + 1 is refused *)
 prfn _fact {source,litlen,dist,before,after:$A.cells}{p,end_bit:nat}

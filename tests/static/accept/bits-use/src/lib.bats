@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The bits of the byte 5 (101, least significant first): bit 0 is 1, bit 1 is 0; read as BITS they are 1, as HBITS 2 *)
 prfn _bit_zero {source:$A.cells} (found: $A.NTH(source, 0, 5)): $Z.BIT(source, 0, 1) =

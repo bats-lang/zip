@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use result as R
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* An entry's compression is a choice, not a method number *)
 fn _data_of_method_8 {l:agz} (hdr: !$A.arr(byte, l, 30)): void =

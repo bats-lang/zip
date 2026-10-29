@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* RFC 1951 3.2.7: the code length code lengths of a header with two stored lengths (HCLEN + 4 = 2): read three bits each, placed by CL_ORDER (16 and 17), the other 17 symbols absent *)
 prfn _order (): $Z.CL_ORDER($A.ccons(16, $A.ccons(17, $A.ccons(18, $A.ccons(0, $A.ccons(8, $A.ccons(7, $A.ccons(9, $A.ccons(6, $A.ccons(10, $A.ccons(5, $A.ccons(11, $A.ccons(4, $A.ccons(12, $A.ccons(3, $A.ccons(13, $A.ccons(2, $A.ccons(14, $A.ccons(1, $A.ccons(15, $A.cnil())))))))))))))))))))) = $Z.CL_ORDER_mk()
