@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* Symbol 284 with 31 extra bits would be the length 258, which only symbol 285 has (zlib takes it; the RFC and SYMS_copy do not) *)
 prfn _fact {litlen,dist,source,output,next,after:$A.cells}{p,sym,used,length_extra_bits,length_base,length_extra_value,dist_sym,dist_used,dist_extra_bits,dist_base,dist_extra_value,end_bit:nat}

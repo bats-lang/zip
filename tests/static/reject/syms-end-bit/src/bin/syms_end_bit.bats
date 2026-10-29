@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The end-of-block symbol ends at p + used: one bit more is refused *)
 prfn _end_bit {litlen,dist,source,output:$A.cells}{p,sym,used:nat}

@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* A literal appends itself: appending the symbol plus one is refused *)
 prfn _other_byte {litlen,dist,source,output,next,after:$A.cells}{p,sym,used,end_bit:nat}

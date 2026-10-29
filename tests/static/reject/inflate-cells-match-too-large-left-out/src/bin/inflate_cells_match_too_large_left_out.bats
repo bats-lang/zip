@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* the answer too large is a case of its own: a match that leaves it out is refused *)
 fn _answer {compressed:$A.cells} (answer: $Z.inflated_cells(compressed)): int =

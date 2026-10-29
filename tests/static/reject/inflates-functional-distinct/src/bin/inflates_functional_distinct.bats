@@ -1,6 +1,6 @@
 #include "share/atspre_staload.hats"
 #use array as A
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The lemma does not say the outputs differ *)
 prfn _distinct {cs,first,second:$A.cells}

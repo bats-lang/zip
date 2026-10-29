@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The byte copied is the one distance back from the end: the one at distance - 1 is refused *)
 prfn _off_by_one {output,next,after:$A.cells}{output_count,distance,length,copied:nat | 1 <= distance; distance <= output_count; distance >= 2}

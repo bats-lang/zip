@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The copy is read from the window: a copy of the output is another cells *)
 prfn _from_output {window,output,after,both,next_window:$A.cells}{distance,length:nat}

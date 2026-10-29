@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* Both BLOCKS must start at one bit: p and p + 8 are not one *)
 prfn _other_position {source:$A.cells}{p:nat}{before,first,second:$A.cells}

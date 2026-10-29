@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The runs end the lengths: a last run that leaves cells is refused *)
 prfn _not_ended {lengths,after_144,after_112,after_24,rest:$A.cells}

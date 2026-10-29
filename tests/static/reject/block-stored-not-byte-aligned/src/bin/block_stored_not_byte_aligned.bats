@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The stored block starts at the next byte boundary at or after the header: LEN at a byte before p is refused *)
 prfn _too_early {source:$A.cells}{p,data_byte,len,nlen:nat | 8 * data_byte + 8 <= p; len + nlen == 65535}{before,data,after:$A.cells}

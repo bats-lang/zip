@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The code lengths start after the 3 * (HCLEN + 4) bits: after 3 * HCLEN is refused *)
 prfn _fact {source,values,order,code_length_code,all_lengths,litlen,dist,before,after:$A.cells}{p,hlit,hdist,hclen,data_start,end_bit:nat | hlit <= 29; hdist <= 29}

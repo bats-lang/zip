@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The stream of one final stored block "abc" does not inflate to 97, 98, 100 *)
 prfn _wrong_output (): $Z.BLOCKS($A.ccons(1, $A.ccons(3, $A.ccons(0, $A.ccons(252, $A.ccons(255, $A.ccons(97, $A.ccons(98, $A.ccons(99, $A.cnil())))))))), 0, $A.cnil(), $A.ccons(97, $A.ccons(98, $A.ccons(100, $A.cnil())))) =

@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* RUN and SLICE on small cells; the fixed code lengths as four runs and one; the shapes of a code on lengths 1, 1 (complete), 0, 1, 0 (single) and 0, 0 (empty) *)
 prfn _run (): $Z.RUN(2, 7, $A.cnil(), $A.ccons(7, $A.ccons(7, $A.cnil()))) = $Z.RUN_cons($Z.RUN_cons($Z.RUN_zero()))

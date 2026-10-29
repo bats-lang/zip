@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* RFC 1951 3.2.5: symbols 265 (11, one extra bit), 284 (227, five) and 285 (258); distance symbols 4 (5, one extra bit) and 29 (24577, thirteen); and the ranges *)
 prfn _length_265 (power: $AR.POW2(1, 2)): $Z.LENGTH_SYMBOL(265, 1, 11) = $Z.LENGTH_SYMBOL_base_4_times(power)

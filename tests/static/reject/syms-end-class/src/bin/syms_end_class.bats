@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* Only the end-of-block class ends the symbols: a literal class is refused *)
 prfn _literal_ends {litlen,dist,source,output:$A.cells}{p,sym,used:nat}

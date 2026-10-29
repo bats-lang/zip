@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The whole is the earlier cells followed by the later: another cells is refused *)
 prfn _other_whole {earlier,later,whole,other:$A.cells}{p,width,value:nat}

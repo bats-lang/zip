@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* Three bits 1, 0, 1 read least significant first are 5, not 4 *)
 prfn _wrong_value (): $Z.READ_LENGTHS3($A.ccons(45, $A.ccons(0, $A.cnil())), 0, 2, $A.ccons(4, $A.ccons(5, $A.cnil()))) =

@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* A length is at most 258 (symbol 284 with 31 reaches it): 257 is refused *)
 prfn _below {sym,extra_bits,base,value:nat}{source:$A.cells}{p:nat}

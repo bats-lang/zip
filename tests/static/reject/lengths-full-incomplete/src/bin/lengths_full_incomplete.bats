@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* One code of one bit leaves the other unused: 0 + 1 is not 2, so LENGTHS_FULL is refused *)
 prfn _one_one (): $Z.BL_COUNT($A.ccons(1, $A.cnil()), 1, 1) =

@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* A copy of 3 is 3 bytes longer, not 4 *)
 prfn _wrong_length (): $Z.COPY($A.ccons(1, $A.ccons(2, $A.cnil())), 2, 3, $A.ccons(1, $A.ccons(2, $A.ccons(1, $A.ccons(2, $A.ccons(1, $A.ccons(2, $A.cnil()))))))) =

@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* RFC 1951 3.2.2 on lengths 1, 2, 2: the symbols get the codes 0, 10 and 11; the third is the 2-bit code 3 *)
 (* lengths = $A.ccons(1, $A.ccons(2, $A.ccons(2, $A.cnil()))): next_code[1] = 0, next_code[2] = 2 * (0 + 1) = 2 *)

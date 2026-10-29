@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* A code has 1 to 15 bits: CODE_mk refuses 16 *)
 prfn _sixteen {lengths:$A.cells}{sym,first_code,rank:nat}

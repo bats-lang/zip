@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* the barr of the compressed cells holds 1 MiB at most *)
 fn _call {l:agz}{cs:$A.cells} (size: $A.CLEN(cs, 1048577) | compressed: !$A.cborrow(l, 1048577, cs)): $Z.inflated_cells(cs) =
