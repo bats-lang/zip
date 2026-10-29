@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The next symbol starts after the bits the literal used: from p is refused *)
 prfn _same_bit {litlen,dist,source,output,next,after:$A.cells}{p,sym,used,end_bit:nat}

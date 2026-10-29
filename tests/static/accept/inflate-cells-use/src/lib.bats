@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* every answer of the in-memory forms is matched, and the output is a barr whose cells the proof names *)
 fn _answer {compressed:$A.cells} (answer: $Z.inflated_cells(compressed)): int =

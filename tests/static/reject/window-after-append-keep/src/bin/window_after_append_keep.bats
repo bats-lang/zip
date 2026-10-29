@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The window after an append keeps 32768 cells: 32767 is refused *)
 prfn _keep {window,data,next,both,next_window:$A.cells}

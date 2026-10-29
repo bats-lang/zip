@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* A length is at least 3: 4 is refused *)
 prfn _above {sym,extra_bits,base,value:nat}{source:$A.cells}{p:nat}

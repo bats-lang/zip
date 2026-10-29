@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The fixed block with every fact right is accepted, and its functional lemma is used *)
 prfn _control {source,litlen,dist,before,after:$A.cells}{p,end_bit:nat}

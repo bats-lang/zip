@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* A distance reaches back at most 32768 cells: 32769 is refused *)
 prfn _too_far {output,window,after:$A.cells}{length:nat}

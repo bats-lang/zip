@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The window must be the window of the output appended to *)
 prfn _other_output {output,other,window,data,next:$A.cells}{count:nat}

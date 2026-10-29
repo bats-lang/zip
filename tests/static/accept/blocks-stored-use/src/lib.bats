@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* RFC 1951 3.2.3 and 3.2.4: streams of stored blocks, one final block and a non-final one followed by a final one, with the lemmas *)
 (* One final stored block (BFINAL 1, BTYPE 00, LEN 3, NLEN 65532, "abc"): the stream

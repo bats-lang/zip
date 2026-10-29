@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The last 2 cells of [1, 2, 3] are [2, 3], not [1, 2] *)
 prfn _wrong (): $Z.TAKE_LAST($A.ccons(1, $A.ccons(2, $A.ccons(3, $A.cnil()))), 2, $A.ccons(1, $A.ccons(2, $A.cnil()))) =

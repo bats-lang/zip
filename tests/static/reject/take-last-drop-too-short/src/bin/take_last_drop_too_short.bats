@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* Nothing is dropped from a sequence of keep cells: TAKE_LAST_drop refuses a rest shorter than keep *)
 prfn _short_rest (): $Z.TAKE_LAST($A.ccons(1, $A.ccons(2, $A.cnil())), 2, $A.ccons(2, $A.cnil())) =

@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The fit must be of the literal/length code of the symbols *)
 prfn _other_litlen {litlen,other,dist,source:$A.cells}{p:nat}{output,first,second:$A.cells}{first_end,second_end:nat}

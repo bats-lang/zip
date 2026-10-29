@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The start is the number of cells before the chunk: another number is refused *)
 prfn _start {previous,chunk,consumed:$A.cells}{start,other:nat}

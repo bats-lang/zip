@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* A distance is at most 32768 (the table of 3.2.5): 32767 is refused *)
 prfn _below {sym,extra_bits,base,value:nat}{source:$A.cells}{p:nat}

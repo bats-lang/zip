@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* the output of a Deflate stream is not the output of a stored entry *)
 fn _stored {compressed:$A.cells} (answer: $Z.inflated_cells(compressed)): int =

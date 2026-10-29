@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* A distance is at least 1: COPY_step refuses 0 *)
 prfn _zero {output,next,after:$A.cells}{output_count,length,copied:nat}

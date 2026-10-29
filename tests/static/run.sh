@@ -12,7 +12,42 @@
 # Last, every match in src/ and tests/ must be case+.
 #
 # usage: tests/static/run.sh <repository-dir>   (bats must be on PATH)
+# Speed (zip#92): a fixture names zip by `staload Z = "zip/src/lib.sats"`
+# (one line for the `#use zip as Z` it replaces, so every `expect` line stays),
+# so patsopt does not staload zip's lib.dats (244 KB, 33 s) for each fixture;
+# zip has no template (`fun{`, `implement{`), so nothing a check needs is in
+# lib.dats (a fixture that used one would fail with no implementation).
+# `bats lock` reads `#use` lines, so tests/static/zipuse.bats (only
+# `#use zip as Z`) is copied into each fixture's src/ for the lock to fetch zip.
+# BATS_CACHE_DIR is shared by the fixtures (patsopt's C is keyed by the content
+# of everything it read), the first fixture runs alone to fill it, and the rest
+# run in parallel with xargs -P (a third-party tool used as it is; this file
+# is already shell and bats has no pool for fixtures that need their own lock
+# step); each fixture's output is kept in a file and printed in order.
 set -eu
+if [ "${1:-}" = --one ]; then
+  # one fixture: run.sh --one <kind> <name>; ROOT, TMP, REPO in the environment
+  kind=$2; n=$3; d="$ROOT/tests/static/$kind/$n/"; w="$TMP/w-$kind-$n"
+  log="$TMP/$kind-$n.log"; out="$TMP/res-$kind-$n"
+  cp -R "$d" "$w"
+  cp "$ROOT/tests/static/zipuse.bats" "$w/src/zipuse.bats"
+  if (cd "$w" && bats lock --dev --repository "$REPO" && bats check --repository "$REPO") > "$log" 2>&1; then
+    status=pass
+  else
+    status=fail
+  fi
+  if [ "$kind" = accept ] && [ "$status" = pass ]; then
+    echo "ok   accept/$n" > "$out"
+  elif [ "$kind" = reject ] && [ "$status" = fail ] \
+       && python3 -B -I "$ROOT/tests/static/expect.py" "$d" "$log" > "$TMP/$n.expect" 2>&1; then
+    echo "ok   reject/$n" > "$out"
+  elif [ "$kind" = reject ] && [ "$status" = fail ]; then
+    { echo "FAIL reject/$n: rejected, but not as its expect says: $(cat "$TMP/$n.expect")"; tail -8 "$log"; } > "$out"
+  else
+    { echo "FAIL $kind/$n ($status)"; tail -8 "$log"; } > "$out"
+  fi
+  exit 0
+fi
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 python3 -B -I "$ROOT/tests/static/expect_test.py"
 TMP=$(mktemp -d)
@@ -28,30 +63,28 @@ for a in "$TMP/repo/$PKG"/*.bats; do
   [ "$a" = "$NEW" ] || rm -f "$a" "$a.sha256"
 done
 
-fail=0
+BATS_CACHE_DIR="$TMP/cache"; REPO="$TMP/repo"
+export ROOT TMP REPO BATS_CACHE_DIR
+JOBS=${STATIC_JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN)}
+: > "$TMP/list"
 for kind in accept reject; do
   for d in "$ROOT"/tests/static/$kind/*/; do
     [ -f "$d/bats.toml" ] || continue
-    n=$(basename "$d"); w="$TMP/w-$kind-$n"
-    cp -R "$d" "$w"
-    log="$TMP/$kind-$n.log"
-    if (cd "$w" && bats lock --dev --repository "$TMP/repo" && bats check --repository "$TMP/repo") > "$log" 2>&1; then
-      status=pass
-    else
-      status=fail
-    fi
-    if [ "$kind" = accept ] && [ "$status" = pass ]; then
-      echo "ok   accept/$n"
-    elif [ "$kind" = reject ] && [ "$status" = fail ] \
-         && python3 -B -I "$ROOT/tests/static/expect.py" "$d" "$log" > "$TMP/$n.expect" 2>&1; then
-      echo "ok   reject/$n"
-    elif [ "$kind" = reject ] && [ "$status" = fail ]; then
-      echo "FAIL reject/$n: rejected, but not as its expect says: $(cat "$TMP/$n.expect")"; tail -8 "$log"; fail=1
-    else
-      echo "FAIL $kind/$n ($status)"; tail -8 "$log"; fail=1
-    fi
+    echo "$kind $(basename "$d")" >> "$TMP/list"
   done
 done
+echo "fixtures: accept $(grep -c '^accept ' "$TMP/list"), reject $(grep -c '^reject ' "$TMP/list"), jobs $JOBS"
+head -1 "$TMP/list" | xargs -n2 sh "$ROOT/tests/static/run.sh" --one
+tail -n +2 "$TMP/list" | xargs -P "$JOBS" -n2 sh "$ROOT/tests/static/run.sh" --one
+fail=0
+while read -r kind n; do
+  if [ -f "$TMP/res-$kind-$n" ]; then
+    cat "$TMP/res-$kind-$n"
+    grep -q '^FAIL' "$TMP/res-$kind-$n" && fail=1
+  else
+    echo "FAIL $kind/$n (no result)"; fail=1
+  fi
+done < "$TMP/list"
 # Every match is `case+`: a plain `case` (or `case-`) is not checked
 # for exhaustiveness, so a choice could lose a case unseen. Comments,
 # strings and inline C (%{ ... %}, whose switch has its own `case`) are

@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* A stream gives one output; the lemma does not make two differ *)
 prfn _distinct {source:$A.cells}{p:nat}{before,first,second:$A.cells}

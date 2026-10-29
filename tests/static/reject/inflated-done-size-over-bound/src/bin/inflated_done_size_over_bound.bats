@@ -2,7 +2,7 @@
 #use array as A
 #use arith as AR
 #use file as F
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 #target native begin
 
 (* the output of the reader and writer forms is at most 2147483647 bytes *)

@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use result as R
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* Each compression names its decoder *)
 fn _decoder_name (method: $Z.compression): string =

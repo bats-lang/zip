@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* Bits decode using one number of bits; the lemma does not give it one more *)
 prfn _plus_one {lengths,source:$A.cells}{maxlen,p,first_sym,first_used,second_sym,second_used:nat}

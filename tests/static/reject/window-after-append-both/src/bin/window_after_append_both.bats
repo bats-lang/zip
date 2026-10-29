@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The cells cut are the window followed by the data: the data first is refused *)
 prfn _order {window,data,next,both,next_window:$A.cells}

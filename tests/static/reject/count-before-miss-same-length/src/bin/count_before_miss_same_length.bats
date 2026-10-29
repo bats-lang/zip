@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* A symbol of the length counted is a hit: COUNT_BEFORE_miss refuses it *)
 prfn _same_is_not_a_miss {rest:$A.cells}{until,count:nat}{len:int}

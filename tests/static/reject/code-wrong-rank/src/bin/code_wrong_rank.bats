@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The code of a symbol is the first code of its length plus its rank: one more is refused *)
 prfn _rank_plus_one {lengths:$A.cells}{sym,len,first_code,rank:nat | 1 <= len; len <= 15}

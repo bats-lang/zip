@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* The window has the cells of the slice: a count of one more is refused *)
 prfn _count (): $Z.WINDOW_IN_BUFFER($A.ccons(9, $A.ccons(1, $A.ccons(2, $A.ccons(3, $A.cnil())))), 1, $A.ccons(1, $A.ccons(2, $A.ccons(3, $A.cnil())))) =

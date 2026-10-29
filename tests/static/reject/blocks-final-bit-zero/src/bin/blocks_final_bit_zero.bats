@@ -1,7 +1,7 @@
 #include "share/atspre_staload.hats"
 #use array as A
 #use arith as AR
-#use zip as Z
+staload Z = "zip/src/lib.sats"
 
 (* BLOCKS_last needs BFINAL 1: a first bit that is 0 is refused *)
 prfn _not_final {source:$A.cells}{p,btype,end_bit:nat}{before,after:$A.cells}
