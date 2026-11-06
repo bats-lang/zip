@@ -115,8 +115,8 @@ answer `inflated_cells` (`done`, `empty`, `malformed`, `too_large`). The reader 
 native only (`#target native`, they name `$F`); the in-memory forms and everything under them are both
 targets.
 
-One decoding core serves both: the input is a datavtype (a copy of the barr, or the reader with a refill)
-and the output a datavtype (a 1 MiB barr, or a 64 KiB window with the writer and a slide), each indexed
+One decoding core serves all three: the input is a datavtype (a copy of the barr, or the reader with a refill)
+and the output a datavtype (a 1 MiB barr, a piece of an arena of up to 16 MiB with its lend (keyword: arena-output), or a 64 KiB window with the writer and a slide), each indexed
 by what it holds. The proof of a stream is built as the decoder runs: each symbol, copy and block adds
 its relation (`SYMS`, `BLOCK`, `BLOCKS`), and a later read of more input is carried to the longer cells
 by `EXT` (the cells so far are a prefix of the whole), so no link of the chain is rebuilt. A stored
