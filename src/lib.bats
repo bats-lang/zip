@@ -2859,7 +2859,7 @@ datavtype external_writer($A.cells) =
   | {output:$A.cells} writer_failed(output) of ($F.io_error)
 
 
-(* The output so far, the cells output, written of them. A memory sink keeps all of it in one array of 1 MiB; a streaming sink writes
+(* The output so far, the cells output, written of them. A memory sink keeps all of it in one array of 1 MiB, an arena sink in a piece of an arena (up to 16 MiB, keyword: arena-output); a streaming sink writes
    each byte to the writer and keeps the last of it, in an array of 64 KiB, for the copies (a back-reference reaches 32768 bytes back). *)
 datavtype sink(bool, $A.cells, int) =
   | {output,junk,buffer:$A.cells}{written:nat | written <= 1048576}{l:agz}
@@ -2867,19 +2867,29 @@ datavtype sink(bool, $A.cells, int) =
   | {output,held,junk,buffer:$A.cells}{written,fill:nat | fill <= 65536; written <= 2147483647}{l:agz}
     sink_streaming(false, output, written) of ($A.CLEN(output, written), $A.CLEN(held, fill), $A.APPEND(held, junk, buffer), _TAILWIN(output, held, 32768) |
                                         external_writer(output), $A.barr(l, 65536, buffer), int written, int fill)
+  | {output,junk,buffer:$A.cells}{max:pos | max <= 16777216}{written:nat | written <= max}{l,la:agz}
+    sink_arena(true, output, written) of ($A.CLEN(output, written), $A.APPEND(output, junk, buffer), $A.arrx_lent(l, max, la) |
+                                          $A.arena(byte, la, max, max, 1), $A.barr(l, max, buffer), int written, int max)
   | {buffer:$A.cells}{l:agz} sink_memory_overflow(true, $A.cnil(), 0) of ($A.barr(l, 1048576, buffer))
+  | {buffer:$A.cells}{max:pos | max <= 16777216}{l,la:agz}
+    sink_arena_overflow(true, $A.cnil(), 0) of ($A.arrx_lent(l, max, la) | $A.arena(byte, la, max, max, 1), $A.barr(l, max, buffer))
   | {output,buffer:$A.cells}{l:agz} sink_streaming_stopped(false, $A.cnil(), 0) of (external_writer(output), $A.barr(l, 65536, buffer))
 
 end (* native *)
 
 #target wasm begin
 
-(* The output so far, the cells output, written of them. A memory sink keeps all of it in one array of 1 MiB; a streaming sink writes
+(* The output so far, the cells output, written of them. A memory sink keeps all of it in one array of 1 MiB, an arena sink in a piece of an arena (up to 16 MiB, keyword: arena-output); a streaming sink writes
    each byte to the writer and keeps the last of it, in an array of 64 KiB, for the copies (a back-reference reaches 32768 bytes back). *)
 datavtype sink(bool, $A.cells, int) =
   | {output,junk,buffer:$A.cells}{written:nat | written <= 1048576}{l:agz}
     sink_memory(true, output, written) of ($A.CLEN(output, written), $A.APPEND(output, junk, buffer) | $A.barr(l, 1048576, buffer), int written)
+  | {output,junk,buffer:$A.cells}{max:pos | max <= 16777216}{written:nat | written <= max}{l,la:agz}
+    sink_arena(true, output, written) of ($A.CLEN(output, written), $A.APPEND(output, junk, buffer), $A.arrx_lent(l, max, la) |
+                                          $A.arena(byte, la, max, max, 1), $A.barr(l, max, buffer), int written, int max)
   | {buffer:$A.cells}{l:agz} sink_memory_overflow(true, $A.cnil(), 0) of ($A.barr(l, 1048576, buffer))
+  | {buffer:$A.cells}{max:pos | max <= 16777216}{l,la:agz}
+    sink_arena_overflow(true, $A.cnil(), 0) of ($A.arrx_lent(l, max, la) | $A.arena(byte, la, max, max, 1), $A.barr(l, max, buffer))
 
 end (* wasm *)
 
@@ -2963,40 +2973,59 @@ dataprop PUT_DONE($A.cells, int, $A.cells, int, int) =
   | {output,output2:$A.cells}{b,written,written2:nat | b < 256; written2 == written + 1}
     PUT_DONE_mk(output, b, output2, written, written2) of ($A.APPEND(output, $A.ccons(b, $A.cnil()), output2), $A.CLEN(output2, written2))
 
-(* the memory sink's halves of sink_get and sink_put (keyword: output) *)
-fn memory_sink_get {output,junk,buffer:$A.cells}{written,distance:nat | 1 <= distance; distance <= written; written <= 1048576}{l:agz}
-  (output_len: $A.CLEN(output, written), appended: $A.APPEND(output, junk, buffer) | buffer: !$A.barr(l, 1048576, buffer), written: int written, distance: int distance)
+(* the memory and arena sinks' halves of sink_get and sink_put (keyword: output); they differ in the size of the buffer (max) and in who gives it back *)
+fn memory_sink_get {output,junk,buffer:$A.cells}{max:pos}{written,distance:nat | 1 <= distance; distance <= written; written <= max}{l:agz}
+  (output_len: $A.CLEN(output, written), appended: $A.APPEND(output, junk, buffer) | buffer: !$A.barr(l, max, buffer), written: int written, distance: int distance)
   : [v:nat | v < 256] ($A.NTH(output, written - distance, v) | int v) = let
   val (found | v) = $A.barr_get(buffer, written - distance)
   prval $A.APPEND_made(sized) = appended
   prval () = _clen_functional(output_len, _append_sized_len(sized))
 in (nth_of_append_left(sized, found) | v) end
 
+fn put_cell {output,junk,buffer:$A.cells}{max:pos}{written,b:nat | written < max; b < 256}{l:agz}
+  (output_len: $A.CLEN(output, written), appended: $A.APPEND(output, junk, buffer) | buffer: $A.barr(l, max, buffer), written: int written, b: int b)
+  : [output2,junk2,buffer2:$A.cells] (PUT_DONE(output, b, output2, written, written + 1), $A.CLEN(output2, written + 1), $A.APPEND(output2, junk2, buffer2) | $A.barr(l, max, buffer2)) = let
+  val (set | buffer2) = $A.barr_set(buffer, written, b)
+  prval $A.APPEND_made(sized) = appended
+  prval (snoc, appended2) = append_setc(output_len, sized, set)
+  prval next_len = _append_clen(snoc, output_len, $A.CLEN_cons($A.CLEN_nil()))
+in (PUT_DONE_mk(snoc, next_len), next_len, appended2 | buffer2) end
+
 fn memory_sink_put {output,junk,buffer:$A.cells}{written,b:nat | written <= 1048576; b < 256}{l:agz}
   (output_len: $A.CLEN(output, written), appended: $A.APPEND(output, junk, buffer) | buffer: $A.barr(l, 1048576, buffer), written: int written, b: int b)
   : [output2:$A.cells][written2:nat][ok:bool]
     (option_v(PUT_DONE(output, b, output2, written, written2), ok) | bool ok, sink(true, output2, written2)) =
   if written < 1048576 then let
-    val (set | buffer2) = $A.barr_set(buffer, written, b)
-    prval $A.APPEND_made(sized) = appended
-    prval (snoc, appended2) = append_setc(output_len, sized, set)
-    prval next_len = _append_clen(snoc, output_len, $A.CLEN_cons($A.CLEN_nil()))
-  in (Some_v(PUT_DONE_mk(snoc, next_len)) | true, sink_memory(next_len, appended2 | buffer2, written + 1)) end
+    val (done, next_len, appended2 | buffer2) = put_cell(output_len, appended | buffer, written, b)
+  in (Some_v(done) | true, sink_memory(next_len, appended2 | buffer2, written + 1)) end
   else (None_v() | false, sink_memory_overflow(buffer))
+
+fn arena_sink_put {output,junk,buffer:$A.cells}{max:pos | max <= 16777216}{written,b:nat | written <= max; b < 256}{l,la:agz}
+  (output_len: $A.CLEN(output, written), appended: $A.APPEND(output, junk, buffer), lent: $A.arrx_lent(l, max, la) |
+   arena: $A.arena(byte, la, max, max, 1), buffer: $A.barr(l, max, buffer), written: int written, max: int max, b: int b)
+  : [output2:$A.cells][written2:nat][ok:bool]
+    (option_v(PUT_DONE(output, b, output2, written, written2), ok) | bool ok, sink(true, output2, written2)) =
+  if written < max then let
+    val (done, next_len, appended2 | buffer2) = put_cell(output_len, appended | buffer, written, b)
+  in (Some_v(done) | true, sink_arena(next_len, appended2, lent | arena, buffer2, written + 1, max)) end
+  else (None_v() | false, sink_arena_overflow(lent | arena, buffer))
 
 #target native begin
 
 fn sink_written {in_memory:bool}{output:$A.cells}{written:nat} (snk: !sink(in_memory, output, written)): ($A.CLEN(output, written) | int written) =
   case+ snk of
   | @sink_memory(output_len, appended | buffer, written) => let val r = (output_len | written) in fold@(snk); r end
+  | @sink_arena(output_len, appended, lent | arena, buffer, written, max) => let val r = (output_len | written) in fold@(snk); r end
   | @sink_streaming(output_len, held_len, appended, tail | writer, buffer, written, fill) => let val r = (output_len | written) in fold@(snk); r end
   | @sink_memory_overflow(buffer) => (fold@(snk); ($A.CLEN_nil() | 0))
+  | @sink_arena_overflow(lent | arena, buffer) => (fold@(snk); ($A.CLEN_nil() | 0))
   | @sink_streaming_stopped(writer, buffer) => (fold@(snk); ($A.CLEN_nil() | 0))
 
 fn sink_get {in_memory:bool}{output:$A.cells}{written,distance:nat | 1 <= distance; distance <= written; distance <= 32768}
   (snk: !sink(in_memory, output, written), distance: int distance): [v:nat | v < 256] ($A.NTH(output, written - distance, v) | int v) =
   case+ snk of
   | @sink_memory(output_len, appended | buffer, written) => let val r = memory_sink_get(output_len, appended | buffer, written, distance) in fold@(snk); r end
+  | @sink_arena(output_len, appended, lent | arena, buffer, written, max) => let val r = memory_sink_get(output_len, appended | buffer, written, distance) in fold@(snk); r end
   | @sink_streaming(output_len, held_len, appended, tail | writer, buffer, written, fill) => let
       prval () = tailwin_covers{distance}(tail, output_len, held_len)
       val (found | v) = $A.barr_get(buffer, fill - distance)
@@ -3013,12 +3042,15 @@ end (* native *)
 fn sink_written {in_memory:bool}{output:$A.cells}{written:nat} (snk: !sink(in_memory, output, written)): ($A.CLEN(output, written) | int written) =
   case+ snk of
   | @sink_memory(output_len, appended | buffer, written) => let val r = (output_len | written) in fold@(snk); r end
+  | @sink_arena(output_len, appended, lent | arena, buffer, written, max) => let val r = (output_len | written) in fold@(snk); r end
   | @sink_memory_overflow(buffer) => (fold@(snk); ($A.CLEN_nil() | 0))
+  | @sink_arena_overflow(lent | arena, buffer) => (fold@(snk); ($A.CLEN_nil() | 0))
 
 fn sink_get {in_memory:bool}{output:$A.cells}{written,distance:nat | 1 <= distance; distance <= written; distance <= 32768}
   (snk: !sink(in_memory, output, written), distance: int distance): [v:nat | v < 256] ($A.NTH(output, written - distance, v) | int v) =
   case+ snk of
   | @sink_memory(output_len, appended | buffer, written) => let val r = memory_sink_get(output_len, appended | buffer, written, distance) in fold@(snk); r end
+  | @sink_arena(output_len, appended, lent | arena, buffer, written, max) => let val r = memory_sink_get(output_len, appended | buffer, written, distance) in fold@(snk); r end
 
 end (* wasm *)
 
@@ -3045,6 +3077,7 @@ fn sink_put {in_memory:bool}{output:$A.cells}{written,b:nat | b < 256} (snk: sin
     (option_v(PUT_DONE(output, b, output2, written, written2), ok) | bool ok, sink(in_memory, output2, written2)) =
   case+ snk of
   | ~sink_memory(output_len, appended | buffer, written) => memory_sink_put(output_len, appended | buffer, written, b)
+  | ~sink_arena(output_len, appended, lent | arena, buffer, written, max) => arena_sink_put(output_len, appended, lent | arena, buffer, written, max, b)
   | ~sink_streaming(output_len, held_len, appended, tail | writer, buffer, written, fill) =>
     if written >= 2147483647 then (None_v() | false, sink_streaming_stopped(writer, buffer))
     else begin
@@ -3080,6 +3113,7 @@ fn sink_put {in_memory:bool}{output:$A.cells}{written,b:nat | b < 256} (snk: sin
       | ~writer_failed(failure) => (None_v() | false, sink_streaming_stopped(writer_failed(failure), buffer))
     end
   | ~sink_memory_overflow(buffer) => (None_v() | false, sink_memory_overflow(buffer))
+  | ~sink_arena_overflow(lent | arena, buffer) => (None_v() | false, sink_arena_overflow(lent | arena, buffer))
   | ~sink_streaming_stopped(writer, buffer) => (None_v() | false, sink_streaming_stopped(writer, buffer))
 
 end (* native *)
@@ -3091,7 +3125,9 @@ fn sink_put {in_memory:bool}{output:$A.cells}{written,b:nat | b < 256} (snk: sin
     (option_v(PUT_DONE(output, b, output2, written, written2), ok) | bool ok, sink(in_memory, output2, written2)) =
   case+ snk of
   | ~sink_memory(output_len, appended | buffer, written) => memory_sink_put(output_len, appended | buffer, written, b)
+  | ~sink_arena(output_len, appended, lent | arena, buffer, written, max) => arena_sink_put(output_len, appended, lent | arena, buffer, written, max, b)
   | ~sink_memory_overflow(buffer) => (None_v() | false, sink_memory_overflow(buffer))
+  | ~sink_arena_overflow(lent | arena, buffer) => (None_v() | false, sink_arena_overflow(lent | arena, buffer))
 
 end (* wasm *)
 
@@ -4445,6 +4481,45 @@ fun copy_borrowed {cells,leading,rest,new_junk,new_cells:$A.cells}{n,i:nat | i <
   | inflated_cells_malformed(compressed) of ()
   | inflated_cells_too_large(compressed) of ()
 
+(* ===== the output of a decode above 1 MiB (bats-lang/zip#95; keyword: arena-output) =====
+   barr_alloc takes at most 1 MiB (array's bound against fragmentation), so inflate_cells_arena_proved takes the output from an arena
+   of the class the caller names (array's ARENA_CLASS, up to 16 MiB): the whole arena is one piece, lent as a barr, and the cells of
+   the output are a prefix of the piece's (APPEND). The compressed data is copied into a piece of an arena of its own class, so it is
+   not bounded by 1 MiB either. The arena and the piece come back in inflated_arena_done, to give back with inflated_arena_release;
+   inflated_arena_get reads a cell of the output with its proof. *)
+
+#pub datavtype inflated_cells_arena(compressed: $A.cells) =
+  | {output,junk,buffer:$A.cells}{max:pos | max <= 16777216}{size:pos | size <= max}{l,la:agz}
+    inflated_arena_done(compressed) of (INFLATES(inflate_deflated(), compressed, output), $A.CLEN(output, size), $A.APPEND(output, junk, buffer), $A.arrx_lent(l, max, la) |
+                                        $A.arena(byte, la, max, max, 1), $A.barr(l, max, buffer), int size)
+  | inflated_arena_empty(compressed) of (INFLATES(inflate_deflated(), compressed, $A.cnil()) | )
+  | inflated_arena_malformed(compressed) of ()
+  | inflated_arena_too_large(compressed) of ()
+  | inflated_arena_no_memory(compressed) of ()
+
+(* The arena and its piece given back, after the output is no longer read *)
+#pub fun inflated_arena_release {l,la:agz}{max,used:nat}{cs:$A.cells}
+  (lent: $A.arrx_lent(l, max, la) | ar: $A.arena(byte, la, max, used, 1), output: $A.barr(l, max, cs)): void
+
+(* Cell i of the output, with the proof that it is cell i of the output cells *)
+#pub fun inflated_arena_get {output,junk,buffer:$A.cells}{l:agz}{max,size,i:nat | i < size; size <= max}
+  (output_len: $A.CLEN(output, size), appended: $A.APPEND(output, junk, buffer) | buffer: !$A.barr(l, max, buffer), i: int i)
+  : [v:nat | v < 256] ($A.NTH(output, i, v) | int v)
+
+fn piece_return {l,la:agz}{m,max,used:nat}{k:pos}{cs:$A.cells}
+  (lent: $A.arrx_lent(l, m, la) | ar: !$A.arena(byte, la, max, used, k) >> $A.arena(byte, la, max, used, k - 1), piece: $A.barr(l, m, cs)): void =
+  $A.arena_return<byte>(ar, $A.barr_to_arrx(lent | piece))
+
+implement inflated_arena_release {l,la}{max,used}{cs} (lent | ar, output) = let
+  val () = piece_return(lent | ar, output)
+in $A.arena_destroy<byte>(ar) end
+
+implement inflated_arena_get {output,junk,buffer}{l}{max,size,i} (output_len, appended | buffer, i) = let
+  val (found | v) = $A.barr_get(buffer, i)
+  prval $A.APPEND_made(sized) = appended
+  prval () = _clen_functional(output_len, _append_sized_len(sized))
+in (nth_of_append_left(sized, found) | v) end
+
 fn memory_inflate {l:agz}{n:nat | n <= 1048576}{cs:$A.cells}
   (size: $A.CLEN(cs, n) | compressed: !$A.cborrow(l, n, cs), n: int n, stored_only: bool)
   : inflated_cells(cs) =
@@ -4483,6 +4558,9 @@ fn memory_inflate {l:agz}{n:nat | n <= 1048576}{cs:$A.cells}
       | ~sink_memory_overflow(output_barr) => let
           val () = $A.barr_free(output_barr)
         in inflated_cells_empty(INFLATES_deflated(blocks) | ) end
+      (* the sink was made here, so the arena sinks are not reachable; they are given back all the same *)
+      | ~sink_arena(_, _, lent | ar, output_barr, _, _) => (inflated_arena_release(lent | ar, output_barr); inflated_cells_malformed())
+      | ~sink_arena_overflow(lent | ar, output_barr) => (inflated_arena_release(lent | ar, output_barr); inflated_cells_malformed())
     end
     else let
       prval None_v() = done_opt
@@ -4490,6 +4568,8 @@ fn memory_inflate {l:agz}{n:nat | n <= 1048576}{cs:$A.cells}
       case+ snk2 of
       | ~sink_memory(_, _ | output_barr, _) => ($A.barr_free(output_barr); inflated_cells_malformed())
       | ~sink_memory_overflow(output_barr) => ($A.barr_free(output_barr); inflated_cells_too_large())
+      | ~sink_arena(_, _, lent | ar, output_barr, _, _) => (inflated_arena_release(lent | ar, output_barr); inflated_cells_malformed())
+      | ~sink_arena_overflow(lent | ar, output_barr) => (inflated_arena_release(lent | ar, output_barr); inflated_cells_malformed())
     end
   end
 
@@ -4502,6 +4582,85 @@ fn memory_inflate {l:agz}{n:nat | n <= 1048576}{cs:$A.cells}
 implement inflate_stored_cells_proved {l}{n}{cs} (size | compressed, n) = memory_inflate(size | compressed, n, true)
 
 implement inflate_cells_proved {l}{n}{cs} (size | compressed, n) = memory_inflate(size | compressed, n, false)
+
+prfn class_most {max:int} (class: $A.ARENA_CLASS(max)): [0 < max; max <= 16777216] void =
+  case+ class of
+  | $A.Arena64KiB() => ()
+  | $A.Arena256KiB() => ()
+  | $A.Arena1MiB() => ()
+  | $A.Arena4MiB() => ()
+  | $A.Arena16MiB() => ()
+
+fn arena_inflate {l:agz}{n:nat}{cs:$A.cells}{max:int}
+  (size: $A.CLEN(cs, n), class: $A.ARENA_CLASS(max) | compressed: !$A.cborrow(l, n, cs), n: int n, max: int max, stored_only: bool)
+  : inflated_cells_arena(cs) =
+  if n = 0 then inflated_arena_malformed()
+  else begin
+    case+ $A.arena_class_of(n) of
+    | ~$A.arena_too_large() => inflated_arena_too_large()
+    | ~$A.arena_fits(in_class | in_max) => begin
+        case+ $A.arena_create_class<byte>(in_class | in_max) of
+        | ~$A.arena_none() => inflated_arena_no_memory()
+        | ~$A.arena_some(in_arena) => begin
+            case+ $A.arena_create_class<byte>(class | max) of
+            | ~$A.arena_none() => let
+                val () = $A.arena_destroy<byte>(in_arena)
+              in inflated_arena_no_memory() end
+            | ~$A.arena_some(out_arena) => let
+                prval () = class_most(class)
+                val in_piece = $A.arena_alloc<byte>(in_arena, n)
+                val out_piece = $A.arena_alloc<byte>(out_arena, max)
+                val (in_len, in_lent | in_barr) = $A.barr_of_arrx(in_piece)
+                val (copied | input_barr) = copy_borrowed(size, $A.CLEN_nil(), $A.APPEND_nil(), $A.APPEND_nil(), in_len | compressed, in_barr, n, 0)
+                prval $A.CELLS_EQ_refl() = copied
+                val inp = input_memory(size | input_barr, n)
+                val (out_len, out_lent | out_barr) = $A.barr_of_arrx(out_piece)
+                val snk = sink_arena($A.CLEN_nil(), $A.APPEND_nil(), out_lent | out_arena, out_barr, 0, max)
+                val (done_opt | ok, inp2, snk2, byte2, bit2) = blocks_loop(BLOCKS_PREFIX_empty(), ext_refl(size) | inp, snk, 0, 0, stored_only)
+                val () = (case+ inp2 of ~input_memory(_ | held, _) => piece_return(in_lent | in_arena, held))
+                val () = $A.arena_destroy<byte>(in_arena)
+              in
+                if ok then let
+                  prval Some_v(BLOCKS_DONE_mk(done_ext, blocks, done_len)) = done_opt
+                  prval $A.CELLS_EQ_refl() = ext_same(done_ext, size, done_len)
+                in
+                  case+ snk2 of
+                  | ~sink_arena(output_len, output_app, lent | ar, output_barr, written, _) =>
+                    if written = 0 then let
+                      prval $A.CELLS_EQ_refl() = clen_zero(output_len)
+                      val () = inflated_arena_release(lent | ar, output_barr)
+                    in inflated_arena_empty(INFLATES_deflated(blocks) | ) end
+                    else inflated_arena_done(INFLATES_deflated(blocks), output_len, output_app, lent | ar, output_barr, written)
+                  | ~sink_arena_overflow(lent | ar, output_barr) => let
+                      val () = inflated_arena_release(lent | ar, output_barr)
+                    in inflated_arena_empty(INFLATES_deflated(blocks) | ) end
+                  (* the sink was made here, so the 1 MiB sinks are not reachable; they are freed all the same *)
+                  | ~sink_memory(_, _ | output_barr, _) => ($A.barr_free(output_barr); inflated_arena_malformed())
+                  | ~sink_memory_overflow(output_barr) => ($A.barr_free(output_barr); inflated_arena_malformed())
+                end
+                else let
+                  prval None_v() = done_opt
+                in
+                  case+ snk2 of
+                  | ~sink_arena(_, _, lent | ar, output_barr, _, _) => (inflated_arena_release(lent | ar, output_barr); inflated_arena_malformed())
+                  | ~sink_arena_overflow(lent | ar, output_barr) => (inflated_arena_release(lent | ar, output_barr); inflated_arena_too_large())
+                  | ~sink_memory(_, _ | output_barr, _) => ($A.barr_free(output_barr); inflated_arena_malformed())
+                  | ~sink_memory_overflow(output_barr) => ($A.barr_free(output_barr); inflated_arena_malformed())
+                end
+              end
+          end
+      end
+  end
+
+#pub fun inflate_stored_cells_arena_proved {l:agz}{n:nat}{cs:$A.cells}{max:int}
+  (size: $A.CLEN(cs, n), class: $A.ARENA_CLASS(max) | compressed: !$A.cborrow(l, n, cs), n: int n, max: int max): inflated_cells_arena(cs)
+
+#pub fun inflate_cells_arena_proved {l:agz}{n:nat}{cs:$A.cells}{max:int}
+  (size: $A.CLEN(cs, n), class: $A.ARENA_CLASS(max) | compressed: !$A.cborrow(l, n, cs), n: int n, max: int max): inflated_cells_arena(cs)
+
+implement inflate_stored_cells_arena_proved {l}{n}{cs}{max} (size, class | compressed, n, max) = arena_inflate(size, class | compressed, n, max, true)
+
+implement inflate_cells_arena_proved {l}{n}{cs}{max} (size, class | compressed, n, max) = arena_inflate(size, class | compressed, n, max, false)
 
 #target native begin
 
