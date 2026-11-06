@@ -18,6 +18,7 @@ NN.expect, and the two cases.txt that name each stream.
          (they must refuse it).
   refuse NN.expect is two letters, the reader fate (c closed before its end,
          e ended) for the stored decoder and for the full decoder.
+  large  00.deflate is one fixed block that inflates to 5 MiB (cell i is (i mod 320) mod 251), for the arena forms.
 """
 import hashlib
 import os
@@ -227,6 +228,30 @@ def chapter(quire):
     return (body * (1048576 // len(body) + 1))[:1048576]
 
 
+LARGE_PERIOD = 320
+LARGE_COPIES = 20320
+LARGE_SIZE = LARGE_PERIOD + 258 * LARGE_COPIES  # 5242880, 5 MiB
+
+
+def large_expected(size=LARGE_SIZE):
+    """The output of the large stream, as the test checks it cell by cell: cell i is (i mod 320) mod 251."""
+    return bytes((i % LARGE_PERIOD) % 251 for i in range(size))
+
+
+def large_stream():
+    """One fixed block: 320 literals, then 20320 copies of length 258 at distance 320 (5 MiB out of 51 KB in, above the 1 MiB of
+    a barr_alloc, for the arena forms of zip#95)."""
+    b = Bits(); b.header(1, 1)
+    for i in range(LARGE_PERIOD):
+        b.literal(i % 251)
+    for _ in range(LARGE_COPIES):
+        b.copy(258, LARGE_PERIOD)
+    b.end()
+    stream = b.bytes()
+    assert inflate(stream) == large_expected(), 'zlib does not inflate the large stream to the closed form'
+    return stream
+
+
 def refuse_cases(data):
     fixed_text = raw_deflate(text(1, 5000), 6, zlib.Z_FIXED)
     dynamic_text = raw_deflate(text(3, 60000), 6)
@@ -289,6 +314,10 @@ def main(argv):
         listing.append('%02d %s' % (index, description))
     with open(os.path.join(refuse, 'cases.txt'), 'w') as f:
         f.write('\n'.join(listing) + '\n')
+    large = os.path.join(out, 'large')  # the stream of the arena forms (zip#95): large/00.deflate, its output is large_expected()
+    os.makedirs(large, exist_ok=True)
+    with open(os.path.join(large, '00.deflate'), 'wb') as f:
+        f.write(large_stream())
     if len(argv) > 3:  # the speed measure's chapter (step 10 of zip#64), in its own directory
         os.makedirs(argv[3], exist_ok=True)
         output = chapter(quire)

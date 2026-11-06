@@ -115,8 +115,8 @@ answer `inflated_cells` (`done`, `empty`, `malformed`, `too_large`). The reader 
 native only (`#target native`, they name `$F`); the in-memory forms and everything under them are both
 targets.
 
-One decoding core serves both: the input is a datavtype (a copy of the barr, or the reader with a refill)
-and the output a datavtype (a 1 MiB barr, or a 64 KiB window with the writer and a slide), each indexed
+One decoding core serves all three: the input is a datavtype (a copy of the barr, or the reader with a refill)
+and the output a datavtype (a 1 MiB barr, a piece of an arena of up to 16 MiB with its lend (keyword: arena-output), or a 64 KiB window with the writer and a slide), each indexed
 by what it holds. The proof of a stream is built as the decoder runs: each symbol, copy and block adds
 its relation (`SYMS`, `BLOCK`, `BLOCKS`), and a later read of more input is carried to the longer cells
 by `EXT` (the cells so far are a prefix of the whole), so no link of the chain is rebuilt. A stored
@@ -149,6 +149,38 @@ writer's file is closed in each. An empty stream cannot be given to the in-memor
 compressor, and a decoder tested on streams of its own making would test nothing about RFC 1951); its expectations are
 zlib's own output and it checks that zlib refuses each refusal stream. The test counts the kind of each stream's first
 block and fails when a kind has none.
+
+## An output above 1 MiB: the arena forms (bats-lang/zip#95; keyword: arena-output)
+
+`inflate_cells_proved` returns its output in one `barr_alloc(1048576)` buffer, and array's `barr_alloc` takes at most 1 MiB on
+purpose (fragmentation), so it answers `inflated_cells_too_large` for a larger entry. `inflate_cells_arena_proved` and
+`inflate_stored_cells_arena_proved` are additive forms beside them (the old forms keep their types and `tests/dynamic/inflate`
+and `tests/static/accept/inflate-cells-use` call them): they take `size: CLEN(cs, n), class: ARENA_CLASS(max) | compressed, n, max`
+and make the output in an arena of the class the caller names (array's `arena_create_class`, `Arena64KiB` to `Arena16MiB`; the
+caller knows the entry's size from the central directory and chooses with `arena_class_of`). The whole arena is one piece, lent as
+a barr by `barr_of_arrx`, and the sink that holds it (`sink_arena`, beside `sink_memory`, with `sink_arena_overflow`) carries the
+lend (`arrx_lent`) and the arena, so the barr that comes out of the decoder is proved to be the one that went in. Nothing in array
+changed: `barr`, `CLEN`, `APPEND` and `barr_get` do not have the 1 MiB bound, only `barr_alloc` has.
+
+The proof of the cells is the one of `inflate_cells_proved`: the same decoder core runs on the sink (`sink_get` and `sink_put` have
+a case for each sink; `memory_sink_get` takes the buffer's size and `put_cell` is the step both sinks share), and `INFLATES`
+is concluded from the `BLOCKS_DONE` the loop returns. What differs is the shape of the answer, because a piece of an arena cannot be
+cut to the size of the output (array has no split for an `arr`): `inflated_arena_done` carries `CLEN(output, size)`, `APPEND(output, junk, buffer)`,
+the lend, the arena (`arena(byte, la, max, max, 1)`) and the barr of `max` bytes, so the cells of the output are a prefix of
+the buffer's. `inflated_arena_get` reads cell `i < size` and concludes `NTH(output, i, v)`; `inflated_arena_release` gives the piece back, returns it to the arena
+and destroys the arena. `empty`, `malformed` and `too_large` (the output is over `max`, or the data is over the largest class) are as for
+the old forms, and `no_memory` is an arena that could not be had. The compressed data is copied into a piece of an arena of its own
+class (`arena_class_of`), so it is not bounded by 1 MiB either. `memory_inflate` and `arena_inflate` each match all four sinks
+that have the index `true`; the arms for the other form's sinks cannot be reached (the sink is made in the function) and give back
+what they hold.
+
+Tested: `tests/dynamic/inflate` (valgrind, no leaks) inflates `large/00.deflate` (one fixed block of 320 literals and 20320 copies of
+length 258 at distance 320, 51135 bytes in, 5 MiB out; `generate.py` makes it and asserts that zlib inflates it to the closed form
+`(i mod 320) mod 251`) with the full decoder in a 16 MiB arena and compares every cell with the closed form through `inflated_arena_get`, gets
+`too_large` from a 1 MiB arena and `malformed` from the stored decoder; and a stored stream of 21 blocks, 1310885 bytes in and 1310780 out (above 1 MiB,
+built in an arena of the test), through the stored decoder, every cell compared (the test runs under
+`tests/dynamic/run.sh`'s `timeout 300` and valgrind, so the passes over 5 MiB are kept to one). `tests/static/accept/inflate-arena-use` matches every answer.
+The 1 MiB forms are removed by bats-lang/zip#96 (p2) once every dependent has moved to these.
 
 ## The speed of inflate_cells_proved in wasm (bats-lang/zip#64; keyword: inflate-speed)
 

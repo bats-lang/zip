@@ -1,0 +1,9 @@
+[package]
+name = "inflate_cells_arena_class_other"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""
