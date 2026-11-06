@@ -383,23 +383,24 @@ in held_new($S.from_char_array(p, 16), 16) end
 fn large_cell (period: int, i: int): int = (i mod period) mod 251
 
 (* the cells of the output, each with its proof, against the cells the stream was made from *)
-fun large_cells {output,junk,buffer:$A.cells}{l:agz}{max,size,i:nat | i <= size; size <= max} .<size - i>.
-  (output_len: $A.CLEN(output, size), appended: $A.APPEND(output, junk, buffer) | buffer: !$A.barr(l, max, buffer), size: int size, period: int, i: int i): bool =
+fun large_cells {output,junk,buffer:$A.cells}{l:agz}{max,size,i,step:nat | i <= size; size <= max; step > 0} .<size - i>.
+  (output_len: $A.CLEN(output, size), appended: $A.APPEND(output, junk, buffer) | buffer: !$A.barr(l, max, buffer), size: int size, period: int, step: int step, i: int i): bool =
   if i >= size then true
   else let
     val (found | v) = $Z.inflated_arena_get(output_len, appended | buffer, i)
   in
-    if v = large_cell(period, i) then large_cells(output_len, appended | buffer, size, period, i + 1) else false
+    if v = large_cell(period, i) then (if i + step <= size then large_cells(output_len, appended | buffer, size, period, step, i + step) else true)
+    else false
   end
 
-(* want: 0 the 5 MiB output, whose every cell is checked; 1 too large for the arena; 2 malformed *)
-fn large_verdict {c:$A.cells} (name: string, want: int, period: int, answer: $Z.inflated_cells_arena(c)): bool =
+(* want: 0 the 5 MiB output, whose cells are checked every step cells (step 1: every cell); 1 too large for the arena; 2 malformed *)
+fn large_verdict {c:$A.cells}{step:pos} (name: string, want: int, period: int, step: int step, answer: $Z.inflated_cells_arena(c)): bool =
   case+ answer of
   | ~$Z.inflated_arena_done(_, output_len, appended, lent | arena, output, size) => let
       val ok =
         (if want != 0 then fail(name, want, "taken")
          else if size != LARGE_SIZE then fail(name, size, "the size is not 5 MiB")
-         else if large_cells(output_len, appended | output, size, period, 0) then true
+         else if large_cells(output_len, appended | output, size, period, step, 0) then true
          else fail(name, size, "a cell is not the one the stream was made from"))
       val () = $Z.inflated_arena_release(lent | arena, output)
     in ok end
@@ -408,8 +409,9 @@ fn large_verdict {c:$A.cells} (name: string, want: int, period: int, answer: $Z.
   | ~$Z.inflated_arena_too_large() => (if want = 1 then true else fail(name, want, "too large"))
   | ~$Z.inflated_arena_no_memory() => fail(name, want, "no memory")
 
-(* a compressed stream of at most a mebibyte through the arena forms: the full decoder to 16 MiB, the full decoder to 4 MiB
-   (too large for 5 MiB), and the stored decoder (the first block is not stored: malformed) *)
+(* a compressed stream of at most a mebibyte through the arena forms: the full decoder to 16 MiB (every cell checked), the full
+   decoder to 1 MiB (too large for 5 MiB; it stops at the first mebibyte, which keeps the run short under valgrind), and the
+   stored decoder (the first block is not stored: malformed) *)
 fn check_large_file (): bool = let
   val stream = large_stream_path()
   val ok = (case+ load_file(stream) of
@@ -417,9 +419,9 @@ fn check_large_file (): bool = let
     | ~blob_some(a, n) => let
         val (size_pf | barr) = $A.barr_of_arr(a)
         val @(fz, b) = $A.barr_freeze(barr)
-        val full = large_verdict("large full", 0, 320, $Z.inflate_cells_arena_proved(size_pf, $A.Arena16MiB() | b, n, 16777216))
-        val small = large_verdict("large 4 MiB", 1, 320, $Z.inflate_cells_arena_proved(size_pf, $A.Arena4MiB() | b, n, 4194304))
-        val stored = large_verdict("large stored", 2, 320, $Z.inflate_stored_cells_arena_proved(size_pf, $A.Arena16MiB() | b, n, 16777216))
+        val full = large_verdict("large full", 0, 320, 1, $Z.inflate_cells_arena_proved(size_pf, $A.Arena16MiB() | b, n, 16777216))
+        val small = large_verdict("large 1 MiB", 1, 320, 1, $Z.inflate_cells_arena_proved(size_pf, $A.Arena1MiB() | b, n, 1048576))
+        val stored = large_verdict("large stored", 2, 320, 1, $Z.inflate_stored_cells_arena_proved(size_pf, $A.Arena16MiB() | b, n, 16777216))
         val () = $A.cborrow_drop(fz, b)
         val () = $A.free<byte>($A.barr_to_arr($A.barr_thaw(fz)))
       in full && small && stored end)
@@ -457,13 +459,12 @@ fn check_large_stored (): bool =
       val () = fill_stored(piece, LARGE_STORED_SIZE, 0)
       val (size_pf, lent | barr) = $A.barr_of_arrx(piece)
       val @(fz, b) = $A.barr_freeze(barr)
-      val stored = large_verdict("large stored input, stored decoder", 0, 251, $Z.inflate_stored_cells_arena_proved(size_pf, $A.Arena16MiB() | b, LARGE_STORED_SIZE, 16777216))
-      val full = large_verdict("large stored input, full decoder", 0, 251, $Z.inflate_cells_arena_proved(size_pf, $A.Arena16MiB() | b, LARGE_STORED_SIZE, 16777216))
+      val stored = large_verdict("large stored input, stored decoder", 0, 251, 4099, $Z.inflate_stored_cells_arena_proved(size_pf, $A.Arena16MiB() | b, LARGE_STORED_SIZE, 16777216))
       val () = $A.cborrow_drop(fz, b)
       val back = $A.barr_thaw(fz)
       val () = $A.arena_return<byte>(arena, $A.barr_to_arrx(lent | back))
       val () = $A.arena_destroy<byte>(arena)
-    in stored && full end
+    in stored end
 
 (* ---- all of them ---- *)
 

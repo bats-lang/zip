@@ -177,8 +177,9 @@ what they hold.
 Tested: `tests/dynamic/inflate` (valgrind, no leaks) inflates `large/00.deflate` (one fixed block of 320 literals and 20320 copies of
 length 258 at distance 320, 51135 bytes in, 5 MiB out; `generate.py` makes it and asserts that zlib inflates it to the closed form
 `(i mod 320) mod 251`) with the full decoder in a 16 MiB arena and compares every cell with the closed form through `inflated_arena_get`, gets
-`too_large` from a 4 MiB arena and `malformed` from the stored decoder; and a stored stream of 81 blocks, 5243285 bytes (above 1 MiB,
-built in an arena of the test), through both decoders. `tests/static/accept/inflate-arena-use` matches every answer.
+`too_large` from a 1 MiB arena and `malformed` from the stored decoder; and a stored stream of 81 blocks, 5243285 bytes (above 1 MiB,
+built in an arena of the test), through the stored decoder, whose cells are compared every 4099 cells (the test runs under
+`tests/dynamic/run.sh`'s `timeout 300` and valgrind, so the passes over 5 MiB are kept few). `tests/static/accept/inflate-arena-use` matches every answer.
 The 1 MiB forms are removed by bats-lang/zip#96 (p2) once every dependent has moved to these.
 
 ## The speed of inflate_cells_proved in wasm (bats-lang/zip#64; keyword: inflate-speed)
