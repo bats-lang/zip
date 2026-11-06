@@ -428,10 +428,12 @@ in ok end
 
 (* byte p of a stream of stored blocks of 65535 bytes that holds the cells (i mod 251), 81 blocks, 5243285 bytes: above 1 MiB, so
    the compressed data is itself copied into a piece of an arena *)
+fn stored_length (block: int): int = if block = 80 then 80 else 65535
+
 fn stored_byte (p: int): int = let
   val block = p / 65540
   val at = p mod 65540
-  val len = (if block = 80 then 80 else 65535)
+  val len = stored_length(block)
 in
   if at = 0 then (if block = 80 then 1 else 0)
   else if at = 1 then len mod 256

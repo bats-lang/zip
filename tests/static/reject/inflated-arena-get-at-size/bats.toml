@@ -1,0 +1,9 @@
+[package]
+name = "inflated_arena_get_at_size"
+kind = "bin"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"zip" = ""
