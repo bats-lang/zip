@@ -372,7 +372,8 @@ in ok end
 (* ---- the arena forms: an output above 1 MiB (zip#95, keyword: arena-output) ---- *)
 
 #define LARGE_SIZE 5242880
-#define LARGE_STORED_SIZE 5243285
+#define LARGE_STORED_SIZE 1310885
+#define LARGE_STORED_OUTPUT 1310780
 
 fn large_stream_path (): held(16) = let
   var p = @[char][16]('l', 'a', 'r', 'g', 'e', '/', '0', '0', '.', 'd', 'e', 'f', 'l', 'a', 't', 'e')
@@ -394,12 +395,12 @@ fun large_cells {output,junk,buffer:$A.cells}{l:agz}{max,size,i,step:nat | i <= 
   end
 
 (* want: 0 the 5 MiB output, whose cells are checked every step cells (step 1: every cell); 1 too large for the arena; 2 malformed *)
-fn large_verdict {c:$A.cells}{step:pos} (name: string, want: int, period: int, step: int step, answer: $Z.inflated_cells_arena(c)): bool =
+fn large_verdict {c:$A.cells}{step:pos} (name: string, want: int, period: int, step: int step, want_size: int, answer: $Z.inflated_cells_arena(c)): bool =
   case+ answer of
   | ~$Z.inflated_arena_done(_, output_len, appended, lent | arena, output, size) => let
       val ok =
         (if want != 0 then fail(name, want, "taken")
-         else if size != LARGE_SIZE then fail(name, size, "the size is not 5 MiB")
+         else if size != want_size then fail(name, size, "the size is not the one the stream was made for")
          else if large_cells(output_len, appended | output, size, period, step, 0) then true
          else fail(name, size, "a cell is not the one the stream was made from"))
       val () = $Z.inflated_arena_release(lent | arena, output)
@@ -419,25 +420,25 @@ fn check_large_file (): bool = let
     | ~blob_some(a, n) => let
         val (size_pf | barr) = $A.barr_of_arr(a)
         val @(fz, b) = $A.barr_freeze(barr)
-        val full = large_verdict("large full", 0, 320, 1, $Z.inflate_cells_arena_proved(size_pf, $A.Arena16MiB() | b, n, 16777216))
-        val small = large_verdict("large 1 MiB", 1, 320, 1, $Z.inflate_cells_arena_proved(size_pf, $A.Arena1MiB() | b, n, 1048576))
-        val stored = large_verdict("large stored", 2, 320, 1, $Z.inflate_stored_cells_arena_proved(size_pf, $A.Arena16MiB() | b, n, 16777216))
+        val full = large_verdict("large full", 0, 320, 1, LARGE_SIZE, $Z.inflate_cells_arena_proved(size_pf, $A.Arena16MiB() | b, n, 16777216))
+        val small = large_verdict("large 1 MiB", 1, 320, 1, LARGE_SIZE, $Z.inflate_cells_arena_proved(size_pf, $A.Arena1MiB() | b, n, 1048576))
+        val stored = large_verdict("large stored", 2, 320, 1, LARGE_SIZE, $Z.inflate_stored_cells_arena_proved(size_pf, $A.Arena16MiB() | b, n, 16777216))
         val () = $A.cborrow_drop(fz, b)
         val () = $A.free<byte>($A.barr_to_arr($A.barr_thaw(fz)))
       in full && small && stored end)
   val () = held_free(stream)
 in ok end
 
-(* byte p of a stream of stored blocks of 65535 bytes that holds the cells (i mod 251), 81 blocks, 5243285 bytes: above 1 MiB, so
+(* byte p of a stream of stored blocks of 65535 bytes that holds the cells (i mod 251), 21 blocks, 1310885 bytes in and 1310780 out: above 1 MiB, so
    the compressed data is itself copied into a piece of an arena *)
-fn stored_length (block: int): int = if block = 80 then 80 else 65535
+fn stored_length (block: int): int = if block = 20 then 80 else 65535
 
 fn stored_byte (p: int): int = let
   val block = p / 65540
   val at = p mod 65540
   val len = stored_length(block)
 in
-  if at = 0 then (if block = 80 then 1 else 0)
+  if at = 0 then (if block = 20 then 1 else 0)
   else if at = 1 then len mod 256
   else if at = 2 then len / 256
   else if at = 3 then (65535 - len) mod 256
@@ -459,7 +460,7 @@ fn check_large_stored (): bool =
       val () = fill_stored(piece, LARGE_STORED_SIZE, 0)
       val (size_pf, lent | barr) = $A.barr_of_arrx(piece)
       val @(fz, b) = $A.barr_freeze(barr)
-      val stored = large_verdict("large stored input, stored decoder", 0, 251, 4099, $Z.inflate_stored_cells_arena_proved(size_pf, $A.Arena16MiB() | b, LARGE_STORED_SIZE, 16777216))
+      val stored = large_verdict("large stored input, stored decoder", 0, 251, 1, LARGE_STORED_OUTPUT, $Z.inflate_stored_cells_arena_proved(size_pf, $A.Arena16MiB() | b, LARGE_STORED_SIZE, 16777216))
       val () = $A.cborrow_drop(fz, b)
       val back = $A.barr_thaw(fz)
       val () = $A.arena_return<byte>(arena, $A.barr_to_arrx(lent | back))
